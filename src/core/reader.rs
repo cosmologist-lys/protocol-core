@@ -24,7 +24,6 @@ impl<'a> Reader<'a> {
             fields: Vec::new(),
         }
     }
-
     /// 返回总字节数
     pub fn total_len(&self) -> usize {
         self.buffer.len()
@@ -61,8 +60,7 @@ impl<'a> Reader<'a> {
 
     /// 核心功能5: (CRC专用) 获取当前游标之间的所有数据
     /// (这个方法*不*移动游标，仅用于CRC计算)
-    /// (根据我们的约定，sop是排他的，所以切片[0..sop]是正确的)
-    pub fn get_data_to_check(&self) -> ProtocolResult<&[u8]> {
+    pub fn read_bytes_not_move(&self) -> ProtocolResult<&[u8]> {
         self.check_overlap()?;
         Ok(&self.buffer[..self.sop]) // 从0到sop (排他)
     }
@@ -238,7 +236,7 @@ impl<'a> Reader<'a> {
     }
 
     /// 5. 转化翻译结果 -> 返回所有收集到的 Rawfield 这个方法会消耗Reader，表示解析已完成
-    pub fn into_fields(self) -> Vec<Rawfield> {
-        self.fields
+    pub fn into_fields(self) -> ProtocolResult<Vec<Rawfield>> {
+        Ok(self.fields)
     }
 }

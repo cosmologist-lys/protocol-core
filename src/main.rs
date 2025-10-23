@@ -1,5 +1,5 @@
 use crate::{
-    digester::aes_digester::{self, AesCipher, AesMode},
+    digester::aes_digester::{AesCipher, AesMode},
     utils::{crc_util, hex_util},
 };
 

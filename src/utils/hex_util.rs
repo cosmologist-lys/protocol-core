@@ -1,4 +1,9 @@
-use crate::defi::{ProtocolResult, error::ProtocolError};
+use std::num::ParseIntError;
+
+use crate::defi::{
+    ProtocolResult,
+    error::{ProtocolError, hex_error::HexError},
+};
 
 /**
  * 辅助函数：清理 hex 字符串 (trim, strip "0x")
@@ -13,7 +18,7 @@ fn clean_hex_str(hex: &str) -> &str {
 
 pub fn hex_to_bytes(s: &str) -> ProtocolResult<Vec<u8>> {
     ensure_is_machine_code(s)?;
-    hex::decode(s).map_err(|_| ProtocolError::NotHex(s.into()))
+    hex::decode(s).map_err(|_| ProtocolError::HexError(HexError::NotHex(s.into())))
 }
 
 /**
@@ -42,10 +47,10 @@ pub fn hex_to_f64(hex: &str) -> ProtocolResult<f64> {
     //    它会失败，我们将其映射到自定义错误。
     let bytes_array: [u8; 8] = bytes.try_into().map_err(|vec: Vec<u8>| {
         // `vec` 是转换失败时返回的原始 Vec
-        ProtocolError::InvalidFloatLength {
+        ProtocolError::HexError(HexError::InvalidFloatLength {
             expected: 8,
             actual: vec.len(),
-        }
+        })
     })?;
 
     // 3. 从大端序 (Big-Endian) 字节创建 f64
@@ -61,13 +66,12 @@ pub fn hex_to_f32(hex: &str) -> ProtocolResult<f32> {
     let bytes = hex_to_bytes(hex)?;
 
     // 2. 检查长度并转换 (同上, 目标为 4 字节)
-    let bytes_array: [u8; 4] =
-        bytes
-            .try_into()
-            .map_err(|vec: Vec<u8>| ProtocolError::InvalidFloatLength {
-                expected: 4,
-                actual: vec.len(),
-            })?;
+    let bytes_array: [u8; 4] = bytes.try_into().map_err(|vec: Vec<u8>| {
+        ProtocolError::HexError(HexError::InvalidFloatLength {
+            expected: 4,
+            actual: vec.len(),
+        })
+    })?;
 
     // 3. 从大端序 (Big-Endian) 字节创建 f32
     Ok(f32::from_be_bytes(bytes_array))
@@ -103,7 +107,9 @@ pub fn hex_to_f32_or_f64(hex: &str) -> ProtocolResult<f64> {
         actual_len => {
             // 其他所有长度都是错误的
             // 对应 Java: throw new IllegalArgumentException(...)
-            Err(ProtocolError::InvalidFloatLengthEither { actual: actual_len })
+            Err(ProtocolError::HexError(
+                HexError::InvalidFloatLengthEither { actual: actual_len },
+            ))
         }
     }
 }
@@ -152,7 +158,9 @@ pub fn f64_to_hex_by_len(number: f64, byte_length: usize) -> ProtocolResult<Stri
         actual_len => {
             // 对应 Java: throw new JarException(...)
             // 我们重用之前定义的错误类型
-            Err(ProtocolError::InvalidFloatLengthEither { actual: actual_len })
+            Err(ProtocolError::HexError(
+                HexError::InvalidFloatLengthEither { actual: actual_len },
+            ))
         }
     }
 }
@@ -167,18 +175,20 @@ pub fn hex_to_u32(hex: &str) -> ProtocolResult<u32> {
     let v = clean_hex_str(hex);
     // 限制 8 个字符 (4 字节)
     if v.len() > 8 {
-        return Err(ProtocolError::HexLengthError {
+        return Err(ProtocolError::HexError(HexError::HexLengthError {
             context: "u32",
             max_chars: 8,
             actual_chars: v.len(),
-        });
+        }));
     }
     if v.is_empty() {
         return Ok(0);
     }
-    u32::from_str_radix(v, 16).map_err(|e| ProtocolError::HexParseError {
-        context: "u32",
-        reason: e.to_string(),
+    u32::from_str_radix(v, 16).map_err(|e| {
+        ProtocolError::HexError(HexError::HexParseError {
+            context: "u32",
+            reason: e.to_string(),
+        })
     })
 }
 
@@ -195,19 +205,21 @@ pub fn hex_to_i16(hex: &str) -> ProtocolResult<i16> {
     // 限制 4 个字符 (2 字节)
     // (我们无视 Java 奇怪的 4 字节限制, 采用正确的 2 字节)
     if v.len() > 4 {
-        return Err(ProtocolError::HexLengthError {
+        return Err(ProtocolError::HexError(HexError::HexLengthError {
             context: "i16",
             max_chars: 4,
             actual_chars: v.len(),
-        });
+        }));
     }
     if v.is_empty() {
         return Ok(0);
     }
     // 1. 解析为 u16
-    let unsigned_val = u16::from_str_radix(v, 16).map_err(|e| ProtocolError::HexParseError {
-        context: "i16 (from u16)",
-        reason: e.to_string(),
+    let unsigned_val = u16::from_str_radix(v, 16).map_err(|e| {
+        ProtocolError::HexError(HexError::HexParseError {
+            context: "i16 (from u16)",
+            reason: e.to_string(),
+        })
     })?;
     // 2. 按位转换为 i16 (这 1:1 匹配了 Java 的 .shortValue() 行为)
     Ok(unsigned_val as i16)
@@ -223,19 +235,21 @@ pub fn hex_to_i32(hex: &str) -> ProtocolResult<i32> {
     let v = clean_hex_str(hex);
     // 限制 8 个字符 (4 字节)
     if v.len() > 8 {
-        return Err(ProtocolError::HexLengthError {
+        return Err(ProtocolError::HexError(HexError::HexLengthError {
             context: "i32",
             max_chars: 8,
             actual_chars: v.len(),
-        });
+        }));
     }
     if v.is_empty() {
         return Ok(0);
     }
     // 1. 解析为 u32
-    let unsigned_val = u32::from_str_radix(v, 16).map_err(|e| ProtocolError::HexParseError {
-        context: "i32 (from u32)",
-        reason: e.to_string(),
+    let unsigned_val = u32::from_str_radix(v, 16).map_err(|e| {
+        ProtocolError::HexError(HexError::HexParseError {
+            context: "i32 (from u32)",
+            reason: e.to_string(),
+        })
     })?;
     // 2. 按位转换为 i32 (这 1:1 匹配了 Java 的 .intValue() 行为)
     Ok(unsigned_val as i32)
@@ -415,7 +429,9 @@ fn number_to_bits(
     expected_bit_length: usize,
 ) -> ProtocolResult<String> {
     if expected_bit_length == 0 {
-        return Err(ProtocolError::BinaryLengthErrorNegative { bits: 0 });
+        return Err(ProtocolError::HexError(
+            HexError::BinaryLengthErrorNegative { bits: 0 },
+        ));
     }
 
     // 1. 获取 *完整宽度* 的本地二进制字符串
@@ -475,11 +491,12 @@ pub fn u16_to_binary_str(number: u16, expected_bit_length: usize) -> ProtocolRes
 pub fn binary_str_to_i32(binary_str: &str) -> ProtocolResult<i32> {
     ensure_is_machine_code(binary_str)?;
     // 1. 将字符串按 radix 2 (二进制) 解析为 u32
-    let unsigned_val =
-        u32::from_str_radix(binary_str, 2).map_err(|e| ProtocolError::BinaryParseError {
+    let unsigned_val = u32::from_str_radix(binary_str, 2).map_err(|e| {
+        ProtocolError::HexError(HexError::BinaryParseError {
             context: "i32 (from u32)",
             reason: e.to_string(),
-        })?;
+        })
+    })?;
 
     // 2. 将 u32 的比特位重新解释为 i32
     Ok(unsigned_val as i32)
@@ -490,9 +507,11 @@ pub fn binary_str_to_i32(binary_str: &str) -> ProtocolResult<i32> {
  */
 pub fn binary_str_to_u32(binary_str: &str) -> ProtocolResult<u32> {
     ensure_is_machine_code(binary_str)?;
-    u32::from_str_radix(binary_str, 2).map_err(|e| ProtocolError::BinaryParseError {
-        context: "u32",
-        reason: e.to_string(),
+    u32::from_str_radix(binary_str, 2).map_err(|e| {
+        ProtocolError::HexError(HexError::BinaryParseError {
+            context: "u32",
+            reason: e.to_string(),
+        })
     })
 }
 
@@ -501,11 +520,12 @@ pub fn binary_str_to_u32(binary_str: &str) -> ProtocolResult<u32> {
  */
 pub fn binary_str_to_i16(binary_str: &str) -> ProtocolResult<i16> {
     ensure_is_machine_code(binary_str)?;
-    let unsigned_val =
-        u16::from_str_radix(binary_str, 2).map_err(|e| ProtocolError::BinaryParseError {
+    let unsigned_val = u16::from_str_radix(binary_str, 2).map_err(|e| {
+        ProtocolError::HexError(HexError::BinaryParseError {
             context: "i16 (from u16)",
             reason: e.to_string(),
-        })?;
+        })
+    })?;
     Ok(unsigned_val as i16)
 }
 
@@ -514,9 +534,11 @@ pub fn binary_str_to_i16(binary_str: &str) -> ProtocolResult<i16> {
  */
 pub fn binary_str_to_u16(binary_str: &str) -> ProtocolResult<u16> {
     ensure_is_machine_code(binary_str)?;
-    u16::from_str_radix(binary_str, 2).map_err(|e| ProtocolError::BinaryParseError {
-        context: "u16",
-        reason: e.to_string(),
+    u16::from_str_radix(binary_str, 2).map_err(|e| {
+        ProtocolError::HexError(HexError::BinaryParseError {
+            context: "u16",
+            reason: e.to_string(),
+        })
     })
 }
 
@@ -525,11 +547,12 @@ pub fn binary_str_to_u16(binary_str: &str) -> ProtocolResult<u16> {
  */
 pub fn binary_str_to_i8(binary_str: &str) -> ProtocolResult<i8> {
     ensure_is_machine_code(binary_str)?;
-    let unsigned_val =
-        u8::from_str_radix(binary_str, 2).map_err(|e| ProtocolError::BinaryParseError {
+    let unsigned_val = u8::from_str_radix(binary_str, 2).map_err(|e| {
+        ProtocolError::HexError(HexError::BinaryParseError {
             context: "i8 (from u8)",
             reason: e.to_string(),
-        })?;
+        })
+    })?;
     Ok(unsigned_val as i8)
 }
 
@@ -538,14 +561,23 @@ pub fn binary_str_to_i8(binary_str: &str) -> ProtocolResult<i8> {
  */
 pub fn binary_str_to_u8(binary_str: &str) -> ProtocolResult<u8> {
     ensure_is_machine_code(binary_str)?;
-    u8::from_str_radix(binary_str, 2).map_err(|e| ProtocolError::BinaryParseError {
-        context: "u8",
-        reason: e.to_string(),
-    })
+    let err_catcher = move |e: ParseIntError| {
+        ProtocolError::HexError(HexError::BinaryParseError {
+            context: "u8",
+            reason: e.to_string(),
+        })
+    };
+    u8::from_str_radix(binary_str, 2).map_err(err_catcher)
 }
 
 pub fn binary_str_to_bits(binary_str: &str) -> ProtocolResult<Vec<bool>> {
     ensure_is_machine_code(binary_str)?;
+    let err_catcher = move |e: char| {
+        ProtocolError::HexError(HexError::BinaryParseError {
+            context: "Vec<bool>",
+            reason: format!("Invalid character '{}' found in binary string", e),
+        })
+    };
     binary_str
         .chars()
         .map(|c| match c {
@@ -557,13 +589,7 @@ pub fn binary_str_to_bits(binary_str: &str) -> ProtocolResult<Vec<bool>> {
         // 1. 如果所有都是 Ok(T), 它返回 Ok(Vec<T>)
         // 2. 如果遇到 *第一个* Err(E), 它会立即停止并返回 Err(E)
         .collect::<Result<Vec<bool>, char>>()
-        .map_err(|invalid_char| ProtocolError::BinaryParseError {
-            context: "Vec<bool>",
-            reason: format!(
-                "Invalid character '{}' found in binary string",
-                invalid_char
-            ),
-        })
+        .map_err(err_catcher)
 }
 
 pub fn swap(hex: &str) -> ProtocolResult<String> {
@@ -598,11 +624,11 @@ pub fn cut_bytes(data: &[u8], start_index: i64, end_index: i64) -> ProtocolResul
 
     // 2. 两个脚标都为负数的时候，startIndex必须大于endIndex
     if start_index < 0 && end_index < 0 && start_index > end_index {
-        return Err(ProtocolError::InvalidRange {
+        return Err(ProtocolError::HexError(HexError::InvalidRange {
             start: start_index,
             end: end_index,
             reason: "When both indices are negative, start_index must be <= end_index".to_string(),
-        });
+        }));
     }
 
     // 3. 将 start_index (i64) 解析为 final_start (usize)
@@ -673,7 +699,7 @@ pub fn ensure_is_machine_code(s: &str) -> ProtocolResult<()> {
     let fail = is_hex(s) || is_ascii_hex(s) || is_bcd(s);
     match fail {
         true => Ok(()),
-        false => Err(ProtocolError::NotMachineCode(s.into())),
+        false => Err(ProtocolError::HexError(HexError::NotMachineCode(s.into()))),
     }
 }
 
@@ -681,7 +707,7 @@ pub fn ensure_is_bcd(s: &str) -> ProtocolResult<()> {
     if is_bcd(s) {
         Ok(())
     } else {
-        Err(ProtocolError::NotBcd(s.into()))
+        Err(ProtocolError::HexError(HexError::NotBcd(s.into())))
     }
 }
 
@@ -689,7 +715,7 @@ pub fn ensure_is_ascii_hex(s: &str) -> ProtocolResult<()> {
     if is_ascii_hex(s) {
         Ok(())
     } else {
-        Err(ProtocolError::NotAscii(s.into()))
+        Err(ProtocolError::HexError(HexError::NotAscii(s.into())))
     }
 }
 
@@ -718,9 +744,9 @@ pub fn string_to_ascii(plain_str: &str) -> ProtocolResult<String> {
 
     // 1. 验证输入是否为纯 ASCII
     if !plain_str.is_ascii() {
-        return Err(ProtocolError::NotAscii(
+        return Err(ProtocolError::HexError(HexError::NotAscii(
             "Input string contains non-ASCII characters".into(),
-        ));
+        )));
     }
 
     // 2. 将 ASCII 字符串的字节转换为 Hex
@@ -744,14 +770,14 @@ pub fn replace_bytes(
 ) -> ProtocolResult<Vec<u8>> {
     // 非空校验
     if ori_bytes.is_empty() {
-        return Err(ProtocolError::InvalidInput(
+        return Err(ProtocolError::HexError(HexError::InvalidInput(
             "Original bytes cannot be empty".into(),
-        ));
+        )));
     }
     if replace_bytes.is_empty() {
-        return Err(ProtocolError::InvalidInput(
+        return Err(ProtocolError::HexError(HexError::InvalidInput(
             "Replacement bytes cannot be empty".into(),
-        ));
+        )));
     }
 
     let total_length = ori_bytes.len();
@@ -759,28 +785,28 @@ pub fn replace_bytes(
 
     // start_byte_pos 校验
     if start_byte_pos < 0 {
-        return Err(ProtocolError::InvalidRange {
+        return Err(ProtocolError::HexError(HexError::InvalidRange {
             start: start_byte_pos,
             end: end_byte_pos,
             reason: "start_byte_pos must be 0 or positive".into(),
-        });
+        }));
     }
 
     // 当 end_byte_pos 为正时
     if end_byte_pos > 0 {
         if start_byte_pos > end_byte_pos {
-            return Err(ProtocolError::InvalidRange {
+            return Err(ProtocolError::HexError(HexError::InvalidRange {
                 start: start_byte_pos,
                 end: end_byte_pos,
                 reason: "start_byte_pos must be less than or equal to end_byte_pos".into(),
-            });
+            }));
         }
         if end_byte_pos > total_length_i64 {
-            return Err(ProtocolError::InvalidRange {
+            return Err(ProtocolError::HexError(HexError::InvalidRange {
                 start: start_byte_pos,
                 end: end_byte_pos,
                 reason: "end_byte_pos must be less than or equal to original bytes length".into(),
-            });
+            }));
         }
     }
 
@@ -798,11 +824,11 @@ pub fn replace_bytes(
 
     // 3. 最终范围校验 (防止 panic)
     if final_start > final_end {
-        return Err(ProtocolError::InvalidRange {
+        return Err(ProtocolError::HexError(HexError::InvalidRange {
             start: start_byte_pos,
             end: end_byte_pos,
             reason: "Resolved start index is greater than resolved end index".into(),
-        });
+        }));
     }
     // (final_end > total_length 的情况已被上面的校验覆盖)
 
@@ -861,9 +887,9 @@ pub fn pad_bytes_to_block_size(
     let origin_length = data.len();
 
     if block_size == 0 {
-        return Err(ProtocolError::InvalidInput(
+        return Err(ProtocolError::HexError(HexError::InvalidInput(
             "Block size (digit) must be positive".into(),
-        ));
+        )));
     }
 
     // --- 1:1 翻译 Java 的补位长度 (short_by) 计算 ---
@@ -898,10 +924,10 @@ pub fn pad_bytes_to_block_size(
         None => {
             if short_by > 255 {
                 // PKCS#7 补位值不能超过 255
-                return Err(ProtocolError::InvalidInput(format!(
+                return Err(ProtocolError::HexError(HexError::InvalidInput(format!(
                     "Default PKCS#7 padding length ({}) exceeds 255",
                     short_by
-                )));
+                ))));
             }
             short_by as u8
         }
@@ -934,10 +960,10 @@ pub fn pad_bytes_to_length(
     let origin_length = data.len();
 
     if origin_length > total_length {
-        return Err(ProtocolError::PaddingError {
+        return Err(ProtocolError::HexError(HexError::PaddingError {
             original_len: origin_length,
             target_len: total_length,
-        });
+        }));
     }
 
     let short_by = total_length - origin_length;
@@ -951,10 +977,10 @@ pub fn pad_bytes_to_length(
         // 对应 Java: `appendHex = HexUtil.int2Hex(short_by, 1)`
         None => {
             if short_by > 255 {
-                return Err(ProtocolError::InvalidInput(format!(
+                return Err(ProtocolError::HexError(HexError::InvalidInput(format!(
                     "Default PKCS#7 padding length ({}) exceeds 255",
                     short_by
-                )));
+                ))));
             }
             short_by as u8
         }
@@ -983,18 +1009,18 @@ fn parse_padding_hex(padding_hex: Option<&str>) -> ProtocolResult<Option<u8>> {
             let pad_bytes = hex_to_bytes(ph_str.trim())?;
             // 补位 hex 必须是 1 字节
             if pad_bytes.len() != 1 {
-                Err(ProtocolError::InvalidInput(format!(
+                Err(ProtocolError::HexError(HexError::InvalidInput(format!(
                     "Padding hex must be exactly 1 byte (2 chars), but got: {}",
                     ph_str
-                )))
+                ))))
             } else {
                 Ok(Some(pad_bytes[0]))
             }
         }
-        None => Err(ProtocolError::PaddingError {
+        None => Err(ProtocolError::HexError(HexError::PaddingError {
             original_len: 0,
             target_len: 0,
-        }),
+        })),
     }
 }
 

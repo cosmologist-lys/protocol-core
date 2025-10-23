@@ -1,22 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ProtocolError {
-    #[error("CRC checksum mismatch. Expected {expected}, but got {actual}.")]
-    CrcMismatch { expected: u16, actual: u16 },
-
-    #[error("Invalid frame start byte. Expected 0x{expected:02X}, but got 0x{actual:02X}.")]
-    InvalidHead { expected: u8, actual: u8 },
-
-    #[error("Invalid frame end byte. Expected 0x{expected:02X}, but got 0x{actual:02X}.")]
-    InvalidTail { expected: u8, actual: u8 },
-
-    #[error("Unknown or unsupported Data Object ID: {0}")]
-    UnknownCommandId(&'static str),
-
-    #[error("crc calculation error")]
-    CRCCalculateError,
-
+pub enum HexError {
     #[error("input {0} is not a valid hex string")]
     NotHex(String),
 
@@ -79,23 +64,4 @@ pub enum ProtocolError {
         original_len: usize,
         target_len: usize,
     },
-
-    //
-    //
-    #[error("AES Crypto Error: {0}")]
-    CryptoError(String),
-
-    #[error("Invalid AES key length. Expected 16, 24, or 32 bytes, but got {actual}.")]
-    InvalidKeyLength { actual: usize },
-
-    #[error("Unsupported AES mode: {0}")]
-    UnsupportedMode(String),
-
-    #[error(
-        "Input data is too short. Needed at least {needed} bytes, but only {available} remain."
-    )]
-    InputTooShort { needed: usize, available: usize },
-
-    #[error("Validation failed: {0}")]
-    ValidationFailed(String),
 }
