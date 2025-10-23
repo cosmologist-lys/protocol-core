@@ -1,8 +1,14 @@
-use crate::utils::{crc_util, hex_util};
+use crate::{
+    digester::aes_digester::{self, AesCipher, AesMode},
+    utils::{crc_util, hex_util},
+};
 
+pub mod core;
 pub mod defi;
+pub mod digester;
 pub mod utils;
 
+// just for testing
 fn main() {
     let hex = "78FF0000CC020130044F50FD8BD08B11".trim();
     let r = crc_util::calculate_from_hex(defi::crc_enum::CrcType::Crc16Modbus, hex);
@@ -27,4 +33,27 @@ fn main() {
     let h1 = "3322";
     let h1_ = hex_util::pad_hex_to_block_size(h1, 8, None).unwrap();
     println!("h1_ = {}", h1_);
+
+    test_aes();
+}
+
+fn test_aes() {
+    let key = b"0123456789abcdef";
+    let data = b"Hello, AES ECBd!";
+
+    println!("ori-data : {:?}", data);
+
+    let cipher = AesCipher::new(key, AesMode::CBC).unwrap();
+
+    let encrypted = cipher.encrypt(data, &[1]).unwrap();
+    let decrypted = cipher.decrypt(&encrypted, &[1]).unwrap();
+
+    println!("encrypted = {:?}", encrypted);
+    println!("decrypted = {:?}", decrypted);
+
+    // let encrypted_str = String::from_utf8(encrypted).unwrap();
+    // let decrypted_str = String::from_utf8(decrypted).unwrap();
+
+    // println!("encrypted_str = {}", encrypted_str);
+    // println!("decrypted_str = {}", decrypted_str);
 }
