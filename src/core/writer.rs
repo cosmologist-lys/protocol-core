@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     core::raw::{PlaceHolder, Rawfield},
-    defi::{ProtocolResult, error::ProtocolError},
-    utils::hex_util,
+    defi::{ProtocolResult, crc_enum::CrcType, error::ProtocolError},
+    utils::{crc_util, hex_util},
 };
 
 #[derive(Debug, Default)]
@@ -45,6 +45,10 @@ impl Writer {
     pub fn full_hex(self) -> ProtocolResult<String> {
         let bytes = self.buffer()?;
         hex_util::bytes_to_hex(bytes)
+    }
+
+    pub fn capacity(&self) -> ProtocolResult<usize> {
+        Ok(self.buffer.capacity())
     }
 
     pub fn placeholders_tags(&self) -> ProtocolResult<Vec<&str>> {
@@ -119,7 +123,7 @@ impl Writer {
         let fields_pos = self.fields.len();
         let placeholder = PlaceHolder::new(tag, fields_pos, start_pos, end_pos);
 
-        // 3. 写入占位符 (使用我们已有的 write_bytes 逻辑)
+        // 3. 写入占位符 (使用已有的 write_bytes 逻辑)
         self.buffer.extend_from_slice(&placeholder_bytes);
         self.placeholders.insert(tag.into(), placeholder);
 
@@ -169,6 +173,83 @@ impl Writer {
 
         // 6. 将 Rawfield 插入到 fields 列表的正确位置
         self.fields.insert(placeholder.pos, field);
+
+        Ok(self)
+    }
+
+    /// 读取起始位置->终止位置的切片。
+    fn get_buffer_slice(&self, start_index: usize, end_index: isize) -> ProtocolResult<&[u8]> {
+        let total = self.buffer.len();
+
+        // 1. 解析 end_index
+        let ei = if end_index >= 0 {
+            end_index as usize
+        } else {
+            // 负数，从 total 倒数
+            match (total as isize).checked_add(end_index) {
+                Some(index) if index >= 0 => index as usize,
+                _ => {
+                    return Err(ProtocolError::ValidationFailed(format!(
+                        "end_index {} is out of bounds",
+                        end_index
+                    )));
+                }
+            }
+        };
+
+        // 2. 边界安全检查
+        if ei > total {
+            return Err(ProtocolError::ValidationFailed(format!(
+                "end_index {} (resolved to {}) is out of bounds ({})",
+                end_index, ei, total
+            )));
+        }
+
+        if start_index > ei {
+            return Err(ProtocolError::ValidationFailed(format!(
+                "start_index {} is greater than end_index {}",
+                start_index, ei
+            )));
+        }
+
+        // 3. 安全地返回切片 (零拷贝)
+        Ok(&self.buffer[start_index..ei])
+    }
+
+    /// 计算指定范围内字节的 CRC，并将结果“回填”到占位符。
+    ///
+    /// # Arguments
+    /// * `crc_type` - 要使用的 CRC 算法 (例如 CrcType::Crc16Modbus)。
+    /// * `start_index` - 缓冲区中用于计算的起始字节索引 (包含)。
+    /// * `end_index` - 缓冲区中用于计算的结束字节索引 (不包含)。
+    /// * 如果为负数 (例如 -2)，则从末尾计算 (例如 buffer.len() - 2)。
+    /// * `placeholder_tag` - 要“回填”的占位符的 tag。
+    /// * `swap` - 是否翻转CRC字节。
+    /// * 并返回 `Vec<u8>` (例如 `|crc| Ok(crc.to_be_bytes().to_vec())`)。
+    ///
+    pub fn write_crc<F>(
+        &mut self,
+        crc_type: CrcType,
+        start_index: usize,
+        end_index: isize,
+        placeholder_tag: &str,
+        swap: bool,
+    ) -> ProtocolResult<&mut Self> {
+        // 1. 获取需要计算 CRC 的数据切片
+        // (注意：传入 self.buffer.len() 作为总长)
+        let data_to_check = self.get_buffer_slice(start_index, end_index)?;
+
+        // 2. 计算 CRC
+        let crc_value = crc_util::calculate_from_bytes(crc_type, data_to_check)?;
+        let final_crc_value = if swap {
+            crc_value.to_le_bytes()
+        } else {
+            crc_value.to_be_bytes()
+        };
+        let crc_hex = hex_util::bytes_to_hex(&final_crc_value)?;
+
+        // 3. 回填字节
+        self.rewrite_placeholder(placeholder_tag, "crc", &final_crc_value, crc_hex.as_str())?;
 
         Ok(self)
     }

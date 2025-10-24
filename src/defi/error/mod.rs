@@ -1,9 +1,12 @@
+pub mod comm_error;
 pub mod hex_digest_error;
 pub mod hex_error;
 
 use thiserror::Error;
 
-use crate::defi::error::{hex_digest_error::ProtocolDigestError, hex_error::HexError};
+use crate::defi::error::{
+    comm_error::CommError, hex_digest_error::ProtocolDigestError, hex_error::HexError,
+};
 
 #[derive(Error, Debug)]
 pub enum ProtocolError {
@@ -12,6 +15,9 @@ pub enum ProtocolError {
 
     #[error(transparent)]
     HexError(#[from] HexError),
+
+    #[error(transparent)]
+    CommError(#[from] CommError),
 
     #[error("protocol-core Error: {0}")]
     CommonError(String),

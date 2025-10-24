@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use crate::{
     digester::aes_digester::{AesCipher, AesMode},
     utils::{crc_util, hex_util},
@@ -34,7 +36,14 @@ fn main() {
     let h1_ = hex_util::pad_hex_to_block_size(h1, 8, None).unwrap();
     println!("h1_ = {}", h1_);
 
-    test_aes();
+    //test_aes();
+
+    let h2 = 54343u16;
+    let h2_1 = h2.to_be_bytes();
+    let h2_2 = h2.to_le_bytes();
+    let h2_1_ = hex_util::bytes_to_hex(&h2_1).unwrap();
+    let h2_2_ = hex_util::bytes_to_hex(&h2_2).unwrap();
+    println!("be : {:?} , le : {:?}", h2_1_, h2_2_);
 }
 
 fn test_aes() {
