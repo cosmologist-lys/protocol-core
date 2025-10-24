@@ -22,6 +22,11 @@ pub enum ProtocolError {
     #[error("protocol-core Error: {0}")]
     CommonError(String),
 
+    #[error(
+        "protocol-core crc compare error , crc in hex : {ori_crc} , calculated crc : {calc_crc}"
+    )]
+    CrcError { ori_crc: u16, calc_crc: u16 },
+
     #[error("AES Crypto Error: {0}")]
     CryptoError(String),
 

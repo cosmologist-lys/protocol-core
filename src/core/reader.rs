@@ -1,6 +1,7 @@
 use crate::{
     core::raw::Rawfield,
-    defi::{ProtocolResult, error::ProtocolError},
+    defi::{ProtocolResult, bridge::ReportField, crc_enum::CrcType, error::ProtocolError},
+    utils::{crc_util, hex_util},
 };
 
 /// 状态化的字节读取器，用于解析并收集 `Rawfield`。
@@ -58,9 +59,15 @@ impl<'a> Reader<'a> {
         self.sop.saturating_sub(self.pos)
     }
 
+    pub fn to_report_fields(&self) -> ProtocolResult<Vec<ReportField>> {
+        let fields = self.fields.clone();
+        let r: Vec<ReportField> = fields.into_iter().map(|f| f.to_report_field()).collect();
+        Ok(r)
+    }
+
     /// 核心功能5: (CRC专用) 获取当前游标之间的所有数据
     /// (这个方法*不*移动游标，仅用于CRC计算)
-    pub fn read_bytes_not_move(&self) -> ProtocolResult<&[u8]> {
+    pub fn read_between_pos_to_sop_not_move(&self) -> ProtocolResult<&[u8]> {
         self.check_overlap()?;
         Ok(&self.buffer[..self.sop]) // 从0到sop (排他)
     }
@@ -128,7 +135,7 @@ impl<'a> Reader<'a> {
 
         // 3. 计算并获取尾部切片 (使用排他性约定)
         let new_sop = self.sop - len;
-        let raw_bytes = &self.buffer[new_sop..self.sop]; // 切片 [new_sop..sop]
+        let raw_bytes = &self.buffer[new_sop..self.sop];
 
         // 4. 调用翻译
         let raw_field = translator(raw_bytes)?;
@@ -154,12 +161,11 @@ impl<'a> Reader<'a> {
         self.check_remaining(len)?;
         let raw_bytes = &self.buffer[self.pos..self.pos + len];
 
-        // 2. 创建一个反转后的副本，用于翻译
-        let mut reversed_bytes = raw_bytes.to_vec();
-        reversed_bytes.reverse();
+        // 2. 创建一个副本，用于翻译
+        let bytes = raw_bytes.to_vec();
 
         // 3. 调用翻译闭包 (传入反转后的字节)
-        let raw_field = translator(&reversed_bytes)?;
+        let raw_field = translator(&bytes)?;
 
         // 4. 创建 Rawfield (注意：是 *原始* 字节 `raw_bytes`)
         self.fields.push(raw_field);
@@ -171,8 +177,45 @@ impl<'a> Reader<'a> {
         Ok(self)
     }
 
+    pub fn read_and_translate_crc(
+        &mut self,
+        len: usize,
+        crc_mode: CrcType,
+        crc_start_pos: usize,
+        crc_end_pos: isize,
+    ) -> ProtocolResult<&mut Self> {
+        // 1. 检查总剩余空间
+        self.check_remaining(len)?;
+        // 2. 检查游标是否会重叠
+        self.check_overlap()?;
+
+        // 3. 计算并获取尾部切片 (使用排他性约定)
+        let new_sop = self.sop - len;
+        let crc_bytes = &self.buffer[new_sop..self.sop];
+        let crc_hex = hex_util::bytes_to_hex(crc_bytes)?;
+
+        // 4. 计算crc并且进行比较
+        let expected_crc_bytes = self.read_by_index_not_move(crc_start_pos, crc_end_pos)?;
+        let calculated_crc_bytes = crc_util::calculate_from_bytes(crc_mode, expected_crc_bytes)?;
+        crc_util::compare_crc(&crc_hex, calculated_crc_bytes)?;
+
+        // 4. 创建 Rawfield (注意：是 *原始* 字节 `raw_bytes`)
+        let raw_field = Rawfield::new(crc_bytes, "crc", &crc_hex);
+        self.fields.push(raw_field);
+
+        // 5. 移动游标
+        self.pos += len;
+
+        // 6. 返回 &mut self
+        Ok(self)
+    }
+
     // 根据起始脚标和终止脚标读取字节，不移动sop和pos . end_index可以为负值，此时从后往前数
-    pub fn read_by_index(&self, start_index: usize, end_index: isize) -> ProtocolResult<&[u8]> {
+    pub fn read_by_index_not_move(
+        &self,
+        start_index: usize,
+        end_index: isize,
+    ) -> ProtocolResult<&[u8]> {
         // 1. 解析 end_index
         let ei = if end_index >= 0 {
             // end_index 是正数，直接使用
@@ -229,8 +272,8 @@ impl<'a> Reader<'a> {
     where
         F: FnOnce(&[u8], &[u8]) -> ProtocolResult<()>,
     {
-        let expected_calc_crc_fields = self.read_by_index(start_index, end_index);
-        let crc_bytes = self.read_by_index(crc_pos_start_index, crc_pos_end_index);
+        let expected_calc_crc_fields = self.read_by_index_not_move(start_index, end_index);
+        let crc_bytes = self.read_by_index_not_move(crc_pos_start_index, crc_pos_end_index);
         checker(expected_calc_crc_fields?, crc_bytes?)?;
         Ok(self)
     }

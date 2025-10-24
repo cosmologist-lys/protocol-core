@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     core::raw::{PlaceHolder, Rawfield},
-    defi::{ProtocolResult, crc_enum::CrcType, error::ProtocolError},
+    defi::{ProtocolResult, bridge::ReportField, crc_enum::CrcType, error::ProtocolError},
     utils::{crc_util, hex_util},
 };
 
@@ -22,16 +22,6 @@ impl Writer {
         }
     }
 
-    /// 消耗 Writer，返回所有翻译记录
-    pub fn into_fields(self) -> ProtocolResult<Vec<Rawfield>> {
-        Ok(self.fields)
-    }
-
-    /// 消耗 Writer，返回最终的字节包
-    pub fn into_buffer(self) -> ProtocolResult<Vec<u8>> {
-        Ok(self.buffer)
-    }
-
     /// (非消耗) 获取对当前 buffer 的引用
     pub fn buffer(&self) -> ProtocolResult<&[u8]> {
         Ok(&self.buffer)
@@ -40,6 +30,12 @@ impl Writer {
     /// (非消耗) 获取对当前 fields 的引用
     pub fn fields(&self) -> ProtocolResult<&Vec<Rawfield>> {
         Ok(&self.fields)
+    }
+
+    pub fn to_report_fields(&self) -> ProtocolResult<Vec<ReportField>> {
+        let fields = self.fields.clone();
+        let r: Vec<ReportField> = fields.into_iter().map(|f| f.to_report_field()).collect();
+        Ok(r)
     }
 
     pub fn full_hex(self) -> ProtocolResult<String> {

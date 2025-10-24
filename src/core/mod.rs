@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::defi::{ProtocolResult, crc_enum::CrcType, error::ProtocolError};
 
 pub mod raw;
@@ -57,10 +59,14 @@ impl DirectionEnum {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MsgTypeEnum {
-    SignIn,             //("signin", "注册"),
-    DataReport,         //("data_report", "数据上报"),
-    ValveOperation,     //("valve_operation", "阀门控制"),
+    #[serde(rename = "signin")]
+    SignIn, //("signin", "注册"),
+    #[serde(rename = "dataReport")]
+    DataReport, //("data_report", "数据上报"),
+    #[serde(rename = "valve_operation")]
+    ValveOperation, //("valve_operation", "阀门控制"),
     BalanceSync,        //("sync_balance_centre_charging", "余额同步"),
     Recharge,           //("charge_operation", "充值"),
     UpdateGasPrice,     //("update_gas_price", "调价"),

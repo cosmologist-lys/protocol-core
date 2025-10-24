@@ -1,6 +1,8 @@
-use std::io::Read;
+use std::ptr::read;
 
 use crate::{
+    core::{raw::Rawfield, reader::Reader},
+    defi::ProtocolResult,
     digester::aes_digester::{AesCipher, AesMode},
     utils::{crc_util, hex_util},
 };
@@ -11,39 +13,33 @@ pub mod digester;
 pub mod utils;
 
 // just for testing
-fn main() {
-    let hex = "78FF0000CC020130044F50FD8BD08B11".trim();
-    let r = crc_util::calculate_from_hex(defi::crc_enum::CrcType::Crc16Modbus, hex);
-    match r {
-        Err(e) => println!("Error: {}", e),
-        Ok(crc) => println!("CRC: {}", crc),
-    }
-    let bts = hex_util::hex_to_bytes(hex).unwrap();
-    let hex_str = hex_util::bytes_to_hex(&bts).unwrap();
+fn main() -> ProtocolResult<()> {
+    test_hex()
+}
 
-    println!("converted hex : {}", hex_str);
+fn test_hex() -> ProtocolResult<()> {
+    let hex = "68000100711C01003700040C33373432343031303030303230303030303030303030303030303030303030303006E3DEB523054C63DAE0CD380F2576E976FFAD5E55B29BD8FAD9BDB561F7DD2D9BF41A4061140F64A22A5BF15485777294D38C1A003285B3BDE7A72DC10DA77C903F9E16";
+    let buffer = hex_util::hex_to_bytes(hex).unwrap();
+    let mut reader = Reader::new(buffer.as_slice());
 
-    let number_hex = "004714CC";
-    let num = hex_util::hex_to_f32_or_f64(number_hex).unwrap();
+    // head
+    reader
+        .read_and_translate_head(1, |h| {
+            let value = hex_util::bytes_to_hex(h)?;
+            let rf = Rawfield::new(h, "head", value.as_str());
+            Ok(rf)
+        })?
+        .read_and_translate_tail(1, |h| {
+            let value = hex_util::bytes_to_hex(h)?;
+            let rf = Rawfield::new(h, "tail", value.as_str());
+            Ok(rf)
+        })?
+        .read_and_translate_crc(2, defi::crc_enum::CrcType::Crc16Xmodem, 5, -3)?;
 
-    println!("number : {}", num as f32);
+    let rf = reader.to_report_fields()?;
+    println!("result : {:?}", rf);
 
-    let n1: i16 = -22;
-    let n1_ = hex_util::i16_to_hex(n1, 4).unwrap();
-    println!("n1_ = {}", n1_);
-
-    let h1 = "3322";
-    let h1_ = hex_util::pad_hex_to_block_size(h1, 8, None).unwrap();
-    println!("h1_ = {}", h1_);
-
-    //test_aes();
-
-    let h2 = 54343u16;
-    let h2_1 = h2.to_be_bytes();
-    let h2_2 = h2.to_le_bytes();
-    let h2_1_ = hex_util::bytes_to_hex(&h2_1).unwrap();
-    let h2_2_ = hex_util::bytes_to_hex(&h2_2).unwrap();
-    println!("be : {:?} , le : {:?}", h2_1_, h2_2_);
+    Ok(())
 }
 
 fn test_aes() {
