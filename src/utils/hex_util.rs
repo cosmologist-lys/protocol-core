@@ -21,6 +21,13 @@ pub fn hex_to_bytes(s: &str) -> ProtocolResult<Vec<u8>> {
     hex::decode(s).map_err(|_| ProtocolError::HexError(HexError::NotHex(s.into())))
 }
 
+pub fn hex_to_bytes_swap(s: &str) -> ProtocolResult<Vec<u8>> {
+    ensure_is_machine_code(s)?;
+    let swaped_hex = swap(s)?;
+    hex::decode(swaped_hex.as_bytes())
+        .map_err(|_| ProtocolError::HexError(HexError::NotHex(s.into())))
+}
+
 /**
  * byte[] -> hex-string (小写)
  * @param bytes   字节切片
@@ -29,6 +36,25 @@ pub fn hex_to_bytes(s: &str) -> ProtocolResult<Vec<u8>> {
 pub fn bytes_to_hex(bytes: &[u8]) -> ProtocolResult<String> {
     // `hex::encode` 默认转换为小写
     Ok(hex::encode_upper(bytes))
+}
+
+pub fn bytes_to_hex_swap(bytes: &[u8]) -> ProtocolResult<String> {
+    let swapped_bytes = swap_bytes(bytes)?;
+    Ok(hex::encode_upper(swapped_bytes))
+}
+
+pub fn bytes_to_f64(bytes: &[u8]) -> ProtocolResult<f64> {
+    // 1. 检查字节长度是否为 8（f64 固定占 8 字节）
+    // 将 &[u8] 转换为 [u8; 8]，若长度不符则返回错误
+    let bytes_array: [u8; 8] = bytes.try_into().map_err(|_| {
+        ProtocolError::HexError(HexError::InvalidFloatLength {
+            expected: 8,
+            actual: bytes.len(),
+        })
+    })?;
+
+    // 2. 从大端序 (Big-Endian) 字节创建 f64（与原方法保持一致的字节序）
+    Ok(f64::from_be_bytes(bytes_array))
 }
 
 /**
@@ -40,21 +66,19 @@ pub fn hex_to_f64(hex: &str) -> ProtocolResult<f64> {
     // 1. 解析 hex。如果 hex 无效 (奇数长度或非法字符)，
     //    `hex_to_bytes` 会返回 Err(ProtocolError::NotHex)
     let bytes = hex_to_bytes(hex)?;
+    bytes_to_f64(&bytes)
+}
 
-    // 2. 检查长度并转换
-    //    Rust 的 `try_into` 是将 Vec<u8> 转换为 [u8; 8] 的
-    //    最地道、最高效的方式。如果 `bytes.len() != 8`，
-    //    它会失败，我们将其映射到自定义错误。
-    let bytes_array: [u8; 8] = bytes.try_into().map_err(|vec: Vec<u8>| {
-        // `vec` 是转换失败时返回的原始 Vec
+pub fn bytes_to_f32(bytes: &[u8]) -> ProtocolResult<f32> {
+    // 2. 检查长度并转换 (同上, 目标为 4 字节)
+    let bytes_array: [u8; 4] = bytes.try_into().map_err(|_| {
         ProtocolError::HexError(HexError::InvalidFloatLength {
-            expected: 8,
-            actual: vec.len(),
+            expected: 4,
+            actual: bytes.len(),
         })
     })?;
-
-    // 3. 从大端序 (Big-Endian) 字节创建 f64
-    Ok(f64::from_be_bytes(bytes_array))
+    // 3. 从大端序 (Big-Endian) 字节创建 f32
+    Ok(f32::from_be_bytes(bytes_array))
 }
 
 /**
@@ -64,30 +88,10 @@ pub fn hex_to_f64(hex: &str) -> ProtocolResult<f64> {
 pub fn hex_to_f32(hex: &str) -> ProtocolResult<f32> {
     ensure_is_machine_code(hex)?;
     let bytes = hex_to_bytes(hex)?;
-
-    // 2. 检查长度并转换 (同上, 目标为 4 字节)
-    let bytes_array: [u8; 4] = bytes.try_into().map_err(|vec: Vec<u8>| {
-        ProtocolError::HexError(HexError::InvalidFloatLength {
-            expected: 4,
-            actual: vec.len(),
-        })
-    })?;
-
-    // 3. 从大端序 (Big-Endian) 字节创建 f32
-    Ok(f32::from_be_bytes(bytes_array))
+    bytes_to_f32(&bytes)
 }
 
-/**
- * hex -> f64 (自动判断 f32 或 f64)
- *
- * 根据字节长度 (4 or 8) 转换。
- * 如果输入是 4 字节 (f32)，它将被提升 (cast) 为 f64。
- */
-pub fn hex_to_f32_or_f64(hex: &str) -> ProtocolResult<f64> {
-    ensure_is_machine_code(hex)?;
-    let bytes = hex_to_bytes(hex)?;
-
-    // Rust 的 `match` 语句非常适合处理这种情况
+pub fn bytes_to_f32_or_f64(bytes: &[u8]) -> ProtocolResult<f64> {
     match bytes.len() {
         8 => {
             // 长度为 8，执行 f64 逻辑
@@ -115,6 +119,21 @@ pub fn hex_to_f32_or_f64(hex: &str) -> ProtocolResult<f64> {
 }
 
 /**
+ * hex -> f64 (自动判断 f32 或 f64)
+ *
+ * 根据字节长度 (4 or 8) 转换。
+ * 如果输入是 4 字节 (f32)，它将被提升 (cast) 为 f64。
+ */
+pub fn hex_to_f32_or_f64(hex: &str) -> ProtocolResult<f64> {
+    ensure_is_machine_code(hex)?;
+    let bytes = hex_to_bytes(hex)?;
+    bytes_to_f32_or_f64(&bytes)
+}
+
+pub fn f32_to_bytes(number: f32) -> [u8; 4] {
+    number.to_be_bytes()
+}
+/**
  * f32 (单精度) -> hex-string (大写)
  * IEEE754标准
  */
@@ -126,7 +145,9 @@ pub fn f32_to_hex(number: f32) -> ProtocolResult<String> {
     //    这个操作不会失败，所以我们直接 Ok()
     Ok(hex::encode_upper(bytes))
 }
-
+pub fn f64_to_bytes(number: f64) -> [u8; 8] {
+    number.to_be_bytes()
+}
 /**
  * f64 (双精度) -> hex-string (大写)
  * IEEE754标准
@@ -165,6 +186,20 @@ pub fn f64_to_hex_by_len(number: f64, byte_length: usize) -> ProtocolResult<Stri
     }
 }
 
+pub fn bytes_to_u32(bytes: &[u8]) -> ProtocolResult<u32> {
+    // 1. 检查字节长度是否为 4（u32 固定占 4 字节）
+    let bytes_array: [u8; 4] = bytes.try_into().map_err(|_| {
+        ProtocolError::HexError(HexError::HexLengthError {
+            context: "u32",
+            max_chars: 8,
+            actual_chars: bytes.len(),
+        })
+    })?;
+
+    // 2. 从大端序 (Big-Endian) 字节创建 u32（与其他方法保持字节序一致）
+    Ok(u32::from_be_bytes(bytes_array))
+}
+
 /**
  * hex -> u32 (无符号 32-bit 整数)
  *
@@ -192,6 +227,62 @@ pub fn hex_to_u32(hex: &str) -> ProtocolResult<u32> {
     })
 }
 
+pub fn bytes_to_i32(bytes: &[u8]) -> ProtocolResult<i32> {
+    // 1. 检查字节长度是否为 4（u32 固定占 4 字节）
+    let bytes_array: [u8; 4] = bytes.try_into().map_err(|_| {
+        ProtocolError::HexError(HexError::HexLengthError {
+            context: "i32",
+            max_chars: 8,
+            actual_chars: bytes.len(),
+        })
+    })?;
+
+    // 2. 从大端序 (Big-Endian) 字节创建 u32（与其他方法保持字节序一致）
+    Ok(i32::from_be_bytes(bytes_array))
+}
+
+/**
+ * hex -> i32 (有符号 32-bit 整数)
+ *
+ * (例如: "FFFFFFFF" -> 4294967295 (u32) -> -1 (i32))
+ */
+pub fn hex_to_i32(hex: &str) -> ProtocolResult<i32> {
+    ensure_is_machine_code(hex)?;
+    let v = clean_hex_str(hex);
+    // 限制 8 个字符 (4 字节)
+    if v.len() > 8 {
+        return Err(ProtocolError::HexError(HexError::HexLengthError {
+            context: "i32",
+            max_chars: 8,
+            actual_chars: v.len(),
+        }));
+    }
+    if v.is_empty() {
+        return Ok(0);
+    }
+    // 1. 解析为 u32
+    let unsigned_val = u32::from_str_radix(v, 16).map_err(|e| {
+        ProtocolError::HexError(HexError::HexParseError {
+            context: "i32 (from u32)",
+            reason: e.to_string(),
+        })
+    })?;
+    // 2. 按位转换为 i32 (这 1:1 匹配了 Java 的 .intValue() 行为)
+    Ok(unsigned_val as i32)
+}
+pub fn bytes_to_i16(bytes: &[u8]) -> ProtocolResult<i16> {
+    // 1. 检查字节长度是否为 4（u32 固定占 4 字节）
+    let bytes_array: [u8; 2] = bytes.try_into().map_err(|_| {
+        ProtocolError::HexError(HexError::HexLengthError {
+            context: "u32",
+            max_chars: 8,
+            actual_chars: bytes.len(),
+        })
+    })?;
+
+    // 2. 从大端序 (Big-Endian) 字节创建 u32（与其他方法保持字节序一致）
+    Ok(i16::from_be_bytes(bytes_array))
+}
 /**
  * hex -> i16 (有符号 16-bit 整数)
  *
@@ -223,36 +314,6 @@ pub fn hex_to_i16(hex: &str) -> ProtocolResult<i16> {
     })?;
     // 2. 按位转换为 i16 (这 1:1 匹配了 Java 的 .shortValue() 行为)
     Ok(unsigned_val as i16)
-}
-
-/**
- * hex -> i32 (有符号 32-bit 整数)
- *
- * (例如: "FFFFFFFF" -> 4294967295 (u32) -> -1 (i32))
- */
-pub fn hex_to_i32(hex: &str) -> ProtocolResult<i32> {
-    ensure_is_machine_code(hex)?;
-    let v = clean_hex_str(hex);
-    // 限制 8 个字符 (4 字节)
-    if v.len() > 8 {
-        return Err(ProtocolError::HexError(HexError::HexLengthError {
-            context: "i32",
-            max_chars: 8,
-            actual_chars: v.len(),
-        }));
-    }
-    if v.is_empty() {
-        return Ok(0);
-    }
-    // 1. 解析为 u32
-    let unsigned_val = u32::from_str_radix(v, 16).map_err(|e| {
-        ProtocolError::HexError(HexError::HexParseError {
-            context: "i32 (from u32)",
-            reason: e.to_string(),
-        })
-    })?;
-    // 2. 按位转换为 i32 (这 1:1 匹配了 Java 的 .intValue() 行为)
-    Ok(unsigned_val as i32)
 }
 
 pub fn i32_to_hex(number: i32, expected_byte_length: usize) -> ProtocolResult<String> {
@@ -599,10 +660,8 @@ pub fn swap(hex: &str) -> ProtocolResult<String> {
 }
 
 pub fn swap_bytes(bytes: &[u8]) -> ProtocolResult<Vec<u8>> {
-    let mut new_bytes = Vec::with_capacity(bytes.len());
-    for byte in bytes {
-        new_bytes.push(byte.reverse_bits());
-    }
+    let mut new_bytes = Vec::from(bytes);
+    new_bytes.reverse();
     Ok(new_bytes)
 }
 

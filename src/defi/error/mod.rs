@@ -5,13 +5,13 @@ pub mod hex_error;
 use thiserror::Error;
 
 use crate::defi::error::{
-    comm_error::CommError, hex_digest_error::ProtocolDigestError, hex_error::HexError,
+    comm_error::CommError, hex_digest_error::HexDigestError, hex_error::HexError,
 };
 
 #[derive(Error, Debug)]
 pub enum ProtocolError {
     #[error(transparent)]
-    ProtocolError(#[from] ProtocolDigestError), // CrcError 自动转换为 ProtocolError::Crc
+    HexDigestError(#[from] HexDigestError), // CrcError 自动转换为 ProtocolError::Crc
 
     #[error(transparent)]
     HexError(#[from] HexError),

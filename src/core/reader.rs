@@ -11,7 +11,8 @@ pub struct Reader<'a> {
     pos: usize,       // 头部游标 (从0开始, 向前推进)
     sop: usize,       // 尾部游标 (排他性, 从len()开始, 向后推进)
     total: usize,
-    fields: Vec<Rawfield>, // 收集所有解析出的字段
+    fields: Vec<Rawfield>,           // 收集所有解析出的字段
+    current_field: Option<Rawfield>, // 当前正在解析的字段
 }
 
 impl<'a> Reader<'a> {
@@ -23,6 +24,7 @@ impl<'a> Reader<'a> {
             sop: buffer.len(), // 初始sop指向缓冲区的末尾 (排他性)
             total: buffer.len(),
             fields: Vec::new(),
+            current_field: None,
         }
     }
     /// 返回总字节数
@@ -80,6 +82,13 @@ impl<'a> Reader<'a> {
         Ok(slice.to_vec()) // to_vec() 创建一个副本
     }
 
+    /// 2. 读取剩余字节 -> 返回剩余字节的数组 (副本) (并使游标前进到结束位置)
+    pub fn read_remaining(&mut self) -> ProtocolResult<Vec<u8>> {
+        let slice = &self.buffer[self.pos..self.sop];
+        self.pos = self.sop;
+        Ok(slice.to_vec()) // to_vec() 创建一个副本
+    }
+
     /// 2. 读取n个字节并且按照小端格式 -> 返回这n个字节按照小端排列之后的数组 (副本) (并使游标前进 n)
     pub fn read_bytes_le(&mut self, len: usize) -> ProtocolResult<Vec<u8>> {
         self.check_remaining(len)?;
@@ -107,7 +116,7 @@ impl<'a> Reader<'a> {
 
         // 2. 调用翻译闭包
         let raw_field = translator(raw_bytes)?;
-
+        self.current_field = Some(raw_field.clone());
         // 3. 创建并存储 Rawfield
         self.fields.push(raw_field);
 
@@ -139,6 +148,7 @@ impl<'a> Reader<'a> {
 
         // 4. 调用翻译
         let raw_field = translator(raw_bytes)?;
+        self.current_field = Some(raw_field.clone());
         self.fields.push(raw_field);
 
         // 5. 推进(回退)尾部游标
@@ -166,7 +176,7 @@ impl<'a> Reader<'a> {
 
         // 3. 调用翻译闭包 (传入反转后的字节)
         let raw_field = translator(&bytes)?;
-
+        self.current_field = Some(raw_field.clone());
         // 4. 创建 Rawfield (注意：是 *原始* 字节 `raw_bytes`)
         self.fields.push(raw_field);
 
@@ -201,6 +211,7 @@ impl<'a> Reader<'a> {
 
         // 4. 创建 Rawfield (注意：是 *原始* 字节 `raw_bytes`)
         let raw_field = Rawfield::new(crc_bytes, "crc", &crc_hex);
+        self.current_field = Some(raw_field.clone());
         self.fields.push(raw_field);
 
         // 5. 移动游标
