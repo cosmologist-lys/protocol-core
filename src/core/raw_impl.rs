@@ -1,30 +1,31 @@
 use crate::{
     core::raw::{PlaceHolder, Rawfield},
-    defi::ProtocolResult,
     utils::hex_util,
 };
 
 impl Rawfield {
     /// 一个构造函数，用于根据原始字节和翻译结果来创建Rawfield
-    pub fn new(raw_bytes: &[u8], title: &str, value: &str) -> Self {
+    pub fn new(raw_bytes: &[u8], title: String, value: String) -> Self {
         Self {
-            title: title.into(),
+            bytes: raw_bytes.to_vec(),
+            title,
             hex: hex::encode_upper(raw_bytes), // 编码为Hex字符串
-            value: value.into(),
+            value,
         }
     }
 
     pub fn new_with_hex(hex: &'static str, title: &str, value: &str) -> Self {
         Self {
+            bytes: hex_util::hex_to_bytes(hex).unwrap(),
             title: title.into(),
             hex: hex.into(),
             value: value.into(),
         }
     }
 
-    pub fn hex_to_bytes(&self) -> ProtocolResult<Vec<u8>> {
-        hex_util::hex_to_bytes(&self.hex)
-    }
+    // pub fn hex_to_bytes(&self) -> ProtocolResult<Vec<u8>> {
+    //     hex_util::hex_to_bytes(&self.hex)
+    // }
 }
 
 impl PlaceHolder {

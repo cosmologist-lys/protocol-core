@@ -186,6 +186,34 @@ pub fn f64_to_hex_by_len(number: f64, byte_length: usize) -> ProtocolResult<Stri
     }
 }
 
+pub fn bytes_to_u16(bytes: &[u8]) -> ProtocolResult<u16> {
+    // 1. 检查字节长度是否为 2（u16 固定占 2 字节）
+    let bytes_array: [u8; 2] = bytes.try_into().map_err(|_| {
+        ProtocolError::HexError(HexError::HexLengthError {
+            context: "u16",
+            max_chars: 4,
+            actual_chars: bytes.len(),
+        })
+    })?;
+
+    // 2. 从大端序 (Big-Endian) 字节创建 u16（与其他方法保持字节序一致）
+    Ok(u16::from_be_bytes(bytes_array))
+}
+
+pub fn bytes_to_u8(bytes: &[u8]) -> ProtocolResult<u8> {
+    // 1. 检查字节长度是否为 1（u8 固定占 1 字节）
+    let bytes_array: [u8; 1] = bytes.try_into().map_err(|_| {
+        ProtocolError::HexError(HexError::HexLengthError {
+            context: "u8",
+            max_chars: 2,
+            actual_chars: bytes.len(),
+        })
+    })?;
+
+    // 2. 从大端序 (Big-Endian) 字节创建 u8（与其他方法保持字节序一致）
+    Ok(u8::from_be_bytes(bytes_array))
+}
+
 pub fn bytes_to_u32(bytes: &[u8]) -> ProtocolResult<u32> {
     // 1. 检查字节长度是否为 4（u32 固定占 4 字节）
     let bytes_array: [u8; 4] = bytes.try_into().map_err(|_| {
@@ -270,6 +298,21 @@ pub fn hex_to_i32(hex: &str) -> ProtocolResult<i32> {
     // 2. 按位转换为 i32 (这 1:1 匹配了 Java 的 .intValue() 行为)
     Ok(unsigned_val as i32)
 }
+
+pub fn bytes_to_i8(bytes: &[u8]) -> ProtocolResult<i8> {
+    // 1. 检查字节长度是否为 1（u8 固定占 1 字节）
+    let bytes_array: [u8; 1] = bytes.try_into().map_err(|_| {
+        ProtocolError::HexError(HexError::HexLengthError {
+            context: "i8",
+            max_chars: 2,
+            actual_chars: bytes.len(),
+        })
+    })?;
+
+    // 2. 从大端序 (Big-Endian) 字节创建 u8（与其他方法保持字节序一致）
+    Ok(i8::from_be_bytes(bytes_array))
+}
+
 pub fn bytes_to_i16(bytes: &[u8]) -> ProtocolResult<i16> {
     // 1. 检查字节长度是否为 4（u32 固定占 4 字节）
     let bytes_array: [u8; 2] = bytes.try_into().map_err(|_| {

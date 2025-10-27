@@ -56,6 +56,15 @@ impl<'a> Reader<'a> {
         }
     }
 
+    pub fn get_current_field_cloned(&self) -> ProtocolResult<Option<Rawfield>> {
+        if self.current_field.is_some() {
+            let cloned = self.current_field.clone();
+            Ok(cloned)
+        } else {
+            Ok(None)
+        }
+    }
+
     /// 返回剩余未读字节的数量 (pos 和 sop 之间的距离)
     pub fn remaining_len(&self) -> usize {
         self.sop.saturating_sub(self.pos)
@@ -82,13 +91,6 @@ impl<'a> Reader<'a> {
         Ok(slice.to_vec()) // to_vec() 创建一个副本
     }
 
-    /// 2. 读取剩余字节 -> 返回剩余字节的数组 (副本) (并使游标前进到结束位置)
-    pub fn read_remaining(&mut self) -> ProtocolResult<Vec<u8>> {
-        let slice = &self.buffer[self.pos..self.sop];
-        self.pos = self.sop;
-        Ok(slice.to_vec()) // to_vec() 创建一个副本
-    }
-
     /// 2. 读取n个字节并且按照小端格式 -> 返回这n个字节按照小端排列之后的数组 (副本) (并使游标前进 n)
     pub fn read_bytes_le(&mut self, len: usize) -> ProtocolResult<Vec<u8>> {
         self.check_remaining(len)?;
@@ -98,6 +100,25 @@ impl<'a> Reader<'a> {
         let mut data = slice.to_vec(); // 创建副本
         data.reverse(); // 反转字节顺序
         Ok(data)
+    }
+
+    /// 2. 读取剩余字节 -> 返回剩余字节的数组 (副本) (并使游标前进到结束位置)
+    pub fn read_remaining(&mut self) -> ProtocolResult<Vec<u8>> {
+        let slice = &self.buffer[self.pos..self.sop];
+        self.pos = self.sop;
+        Ok(slice.to_vec()) // to_vec() 创建一个副本
+    }
+
+    pub fn read_and_translate_remaining<F>(&mut self, translator: F) -> ProtocolResult<&mut Self>
+    where
+        F: FnOnce(&[u8]) -> ProtocolResult<Rawfield>,
+    {
+        let remaining_bytes = self.read_remaining()?;
+        let raw_field = translator(&remaining_bytes)?;
+        self.current_field = Some(raw_field.clone());
+        // 3. 创建并存储 Rawfield
+        self.fields.push(raw_field);
+        Ok(self)
     }
 
     /// 3. 读取n个字节(大端)，并且进行翻译 -> 返回Reader自身 (用于链式调用)
@@ -210,7 +231,7 @@ impl<'a> Reader<'a> {
         crc_util::compare_crc(&crc_hex, calculated_crc_bytes)?;
 
         // 4. 创建 Rawfield (注意：是 *原始* 字节 `raw_bytes`)
-        let raw_field = Rawfield::new(crc_bytes, "crc", &crc_hex);
+        let raw_field = Rawfield::new(crc_bytes, "crc".into(), crc_hex);
         self.current_field = Some(raw_field.clone());
         self.fields.push(raw_field);
 

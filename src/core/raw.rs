@@ -1,5 +1,6 @@
 #[derive(Debug, Clone, Default)]
 pub struct Rawfield {
+    pub bytes: Vec<u8>,
     pub title: String,
     pub hex: String,
     pub value: String,

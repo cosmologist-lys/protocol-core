@@ -69,7 +69,7 @@ impl Writer {
         let field = translator()?;
 
         // 2. 从 Rawfield 中提取字节
-        let bytes_to_write = field.hex_to_bytes()?;
+        let bytes_to_write = field.bytes.clone();
 
         // 3. 追加字节到缓冲区
         self.buffer.extend_from_slice(&bytes_to_write);
@@ -87,7 +87,7 @@ impl Writer {
         data: &[u8],
         value: &str,
     ) -> ProtocolResult<&mut Self> {
-        let field = Rawfield::new(data, title, value); //
+        let field = Rawfield::new(data, title.into(), value.into()); //
         self.buffer.extend_from_slice(data);
         self.fields.push(field);
         Ok(self)
@@ -165,7 +165,7 @@ impl Writer {
         dest_slice.copy_from_slice(data);
 
         // 5. 创建 Rawfield
-        let field = Rawfield::new(data, title, value);
+        let field = Rawfield::new(data, title.into(), value.into());
 
         // 6. 将 Rawfield 插入到 fields 列表的正确位置
         self.fields.insert(placeholder.pos, field);
