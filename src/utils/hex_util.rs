@@ -479,16 +479,11 @@ pub fn u32_to_hex(number: u32, expected_byte_length: usize) -> ProtocolResult<St
     }
 }
 
-/**
- * u16 (无符号 16-bit) -> hex-string (大写, 带补位或截断)
- *
- * 补位总是使用 '0' (零扩展)。
- */
-pub fn u16_to_hex(number: u16, expected_byte_length: usize) -> ProtocolResult<String> {
-    let native_hex = format!("{:04X}", number);
+pub fn u8_to_hex(number: u8, expected_byte_length: usize) -> ProtocolResult<String> {
+    let native_hex = format!("{:02X}", number);
 
     let expected_char_length = expected_byte_length * 2;
-    const NATIVE_CHAR_LENGTH: usize = 4; // u16 是 4 字符
+    const NATIVE_CHAR_LENGTH: usize = 2; // u8 是 2 字符
 
     match expected_char_length.cmp(&NATIVE_CHAR_LENGTH) {
         std::cmp::Ordering::Less => {
@@ -503,6 +498,32 @@ pub fn u16_to_hex(number: u16, expected_byte_length: usize) -> ProtocolResult<St
             let mut padded_hex = String::with_capacity(expected_char_length);
             for _ in 0..padding_len {
                 padded_hex.push('0');
+            }
+            padded_hex.push_str(&native_hex);
+            Ok(padded_hex)
+        }
+    }
+}
+
+pub fn i8_to_hex(number: i8, expected_byte_length: usize) -> ProtocolResult<String> {
+    let native_hex = format!("{:02X}", number as u8);
+    let expected_char_length = expected_byte_length * 2;
+    const NATIVE_CHAR_LENGTH: usize = 2; // i8 是 2 字符
+
+    match expected_char_length.cmp(&NATIVE_CHAR_LENGTH) {
+        std::cmp::Ordering::Less => {
+            // 截断
+            let start_index = NATIVE_CHAR_LENGTH - expected_char_length;
+            Ok(native_hex[start_index..].to_string())
+        }
+        std::cmp::Ordering::Equal => Ok(native_hex),
+        std::cmp::Ordering::Greater => {
+            // 补位 (例如, 2 字节的 i16 -> 4 字节)
+            let padding_char = if number < 0 { 'F' } else { '0' };
+            let padding_len = expected_char_length - NATIVE_CHAR_LENGTH;
+            let mut padded_hex = String::with_capacity(expected_char_length);
+            for _ in 0..padding_len {
+                padded_hex.push(padding_char);
             }
             padded_hex.push_str(&native_hex);
             Ok(padded_hex)
