@@ -65,6 +65,12 @@ impl<'a> Reader<'a> {
         }
     }
 
+    pub fn set_current_field(&mut self, field: Rawfield) -> ProtocolResult<()> {
+        self.fields.push(field.clone());
+        self.current_field = Some(field);
+        Ok(())
+    }
+
     /// 返回剩余未读字节的数量 (pos 和 sop 之间的距离)
     pub fn remaining_len(&self) -> usize {
         self.sop.saturating_sub(self.pos)
@@ -175,36 +181,6 @@ impl<'a> Reader<'a> {
         // 5. 推进(回退)尾部游标
         self.sop = new_sop;
 
-        Ok(self)
-    }
-
-    /// 4. 读取n个字节并且按照小端格式，并且进行翻译 -> 返回Reader自身
-    pub fn read_and_translate_head_le<F>(
-        &mut self,
-        len: usize,
-        translator: F,
-    ) -> ProtocolResult<&mut Self>
-    where
-        // 翻译函数接收 *反转后* 的字节切片
-        F: FnOnce(&[u8]) -> ProtocolResult<Rawfield>,
-    {
-        // 1. 检查并获取原始字节切片
-        self.check_remaining(len)?;
-        let raw_bytes = &self.buffer[self.pos..self.pos + len];
-
-        // 2. 创建一个副本，用于翻译
-        let bytes = raw_bytes.to_vec();
-
-        // 3. 调用翻译闭包 (传入反转后的字节)
-        let raw_field = translator(&bytes)?;
-        self.current_field = Some(raw_field.clone());
-        // 4. 创建 Rawfield (注意：是 *原始* 字节 `raw_bytes`)
-        self.fields.push(raw_field);
-
-        // 5. 移动游标
-        self.pos += len;
-
-        // 6. 返回 &mut self
         Ok(self)
     }
 

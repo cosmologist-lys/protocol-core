@@ -14,12 +14,16 @@ pub mod reader;
 pub mod writer;
 
 // 单个帧字段的翻译: 翻译模式
+#[derive(Debug, Clone)]
 pub struct FieldConvertDecoder {
     pub title: String,         // 标题
     pub filed_type: FieldType, // 帧字段类型 不为空即是: 翻译模式。
     pub swap: bool,            // 是否高低换位，或true=小端 false=大端
+    // 翻译之后的符号
+    pub symbol: Option<Symbol>,
 }
 
+#[derive(Debug, Clone)]
 // 单个帧字段的翻译：比较模式
 pub struct FieldCompareDecoder {
     pub title: String,           // 标题
@@ -27,6 +31,7 @@ pub struct FieldCompareDecoder {
     pub compare_target: Vec<u8>, // 比较目标 不为空即是：比较模式
 }
 
+#[derive(Debug, Clone)]
 pub struct FieldEnumDecoder {
     pub title: String,                      // 标题
     pub swap: bool,                         // 是否高低换位，或true=小端 false=大端
@@ -39,7 +44,12 @@ impl FieldConvertDecoder {
             title: title.to_string(),
             filed_type,
             swap,
+            symbol: None,
         }
+    }
+
+    pub fn set_symbol(&mut self, symbol: Symbol) {
+        self.symbol = Some(symbol);
     }
 }
 
@@ -70,14 +80,21 @@ pub trait FieldTranslator {
 impl FieldTranslator for FieldConvertDecoder {
     fn translate(&self, bytes: &[u8]) -> ProtocolResult<Rawfield> {
         let mut copied_bytes = bytes.to_vec(); // 替代 clone_from_slice，更简单
-        let input_bytes = if self.swap {
+        let input_bytes = if self.swap && bytes.len() > 1 {
             copied_bytes.reverse();
             copied_bytes
         } else {
             copied_bytes
         };
         let ft = &self.filed_type;
-        let value = ft.convert(&input_bytes)?;
+        let mut value = ft.convert(&input_bytes)?;
+        // 如果有符号，拼接上去
+        if self.symbol.is_some() {
+            let symbol_some_clone = self.symbol.clone();
+            let symbol = symbol_some_clone.unwrap();
+            value += " ";
+            value += symbol.tag().as_str();
+        }
         Ok(Rawfield::new(bytes, self.title.clone(), value))
     }
 }
@@ -85,7 +102,7 @@ impl FieldTranslator for FieldConvertDecoder {
 impl FieldTranslator for FieldCompareDecoder {
     fn translate(&self, bytes: &[u8]) -> ProtocolResult<Rawfield> {
         let mut copied_bytes = bytes.to_vec(); // 替代 clone_from_slice，更简单
-        let input_bytes = if self.swap {
+        let input_bytes = if self.swap && bytes.len() > 1 {
             copied_bytes.reverse();
             copied_bytes
         } else {
@@ -109,7 +126,7 @@ impl FieldTranslator for FieldCompareDecoder {
 impl FieldTranslator for FieldEnumDecoder {
     fn translate(&self, bytes: &[u8]) -> ProtocolResult<Rawfield> {
         let mut copied_bytes = bytes.to_vec(); // 替代 clone_from_slice，更简单
-        let input_bytes = if self.swap {
+        let input_bytes = if self.swap && bytes.len() > 1 {
             copied_bytes.reverse();
             copied_bytes
         } else {
@@ -146,20 +163,21 @@ pub trait ProtocolConfig {
     fn length_index(&self) -> (u8, u8);
 }
 
+#[derive(Debug, Clone)]
 /// 字段类型
 pub enum FieldType {
-    StringOrBCD,       // 文字 or BCD
-    UnsignedU8(f64),   // 正整数(缩小倍数) 1
-    UnsignedU16(f64),  // 正整数(缩小倍数) 2
-    UnsignedU32(f64),  // 正整数(缩小倍数) 3
-    UnsignedU64(f64),  // 正整数(缩小倍数) 4
-    SignedIntI8(f64),  // 正负整数(缩小倍数) 1
-    SignedIntI16(f64), // 正负整数(缩小倍数) 2
-    SignedIntI32(f64), // 正负整数(缩小倍数) 3
-    SignedIntI64(f64), // 正负整数(缩小倍数) 4
-    Float,             // 单精度4字节
-    Double,            // 双精度8字节
-    Ascii,             // ascii
+    StringOrBCD,      // 文字 or BCD
+    UnsignedU8(f64),  // 正整数(缩小倍数) 1
+    UnsignedU16(f64), // 正整数(缩小倍数) 2
+    UnsignedU32(f64), // 正整数(缩小倍数) 3
+    UnsignedU64(f64), // 正整数(缩小倍数) 4
+    SignedI8(f64),    // 正负整数(缩小倍数) 1
+    SignedI16(f64),   // 正负整数(缩小倍数) 2
+    SignedI32(f64),   // 正负整数(缩小倍数) 3
+    SignedI64(f64),   // 正负整数(缩小倍数) 4
+    Float,            // 单精度4字节
+    Double,           // 双精度8字节
+    Ascii,            // ascii
 }
 
 impl FieldType {
@@ -171,10 +189,10 @@ impl FieldType {
             FieldType::UnsignedU16(scale) => handle_int!(u16, 2, bytes, *scale),
             FieldType::UnsignedU32(scale) => handle_int!(u32, 4, bytes, *scale),
             FieldType::UnsignedU64(scale) => handle_int!(u64, 8, bytes, *scale),
-            FieldType::SignedIntI8(scale) => handle_int!(i8, 1, bytes, *scale),
-            FieldType::SignedIntI16(scale) => handle_int!(i16, 2, bytes, *scale),
-            FieldType::SignedIntI32(scale) => handle_int!(i32, 4, bytes, *scale),
-            FieldType::SignedIntI64(scale) => handle_int!(i64, 8, bytes, *scale),
+            FieldType::SignedI8(scale) => handle_int!(i8, 1, bytes, *scale),
+            FieldType::SignedI16(scale) => handle_int!(i16, 2, bytes, *scale),
+            FieldType::SignedI32(scale) => handle_int!(i32, 4, bytes, *scale),
+            FieldType::SignedI64(scale) => handle_int!(i64, 8, bytes, *scale),
             FieldType::Float => {
                 if bytes.len() != 4 {
                     return Err(ProtocolError::ValidationFailed(format!(
@@ -209,6 +227,7 @@ impl FieldType {
     }
 }
 
+#[derive(Debug, Clone)]
 /// 方向
 pub enum DirectionEnum {
     Upstream,   // 上行
@@ -334,4 +353,45 @@ pub trait Command {
     fn code(&self) -> String;
 
     fn description(&self) -> String;
+}
+
+#[derive(Debug, Clone)]
+pub enum Symbol {
+    Percent,
+    Voltage,
+    MilliVoltage,
+    Amber,
+    CubicMeter,
+    Liter,
+    MilliLiter,
+    Celsius,
+    MeterPerSec,
+    MeterPerHour,
+    PA,
+    KPA,
+    CubicMeterPerHour,
+    CubicMeterPerSec,
+    Yuan,
+}
+
+impl Symbol {
+    pub fn tag(&self) -> String {
+        match self {
+            Symbol::Percent => "%".to_string(),
+            Symbol::Voltage => "V".to_string(),
+            Symbol::MilliVoltage => "mV".to_string(),
+            Symbol::Amber => "A".to_string(),
+            Symbol::CubicMeter => "m³".to_string(),
+            Symbol::Liter => "L".to_string(),
+            Symbol::MilliLiter => "mL".to_string(),
+            Symbol::Celsius => "℃".to_string(),
+            Symbol::MeterPerSec => "m/s".to_string(),
+            Symbol::MeterPerHour => "m/h".to_string(),
+            Symbol::PA => "Pa".to_string(),
+            Symbol::KPA => "kPa".to_string(),
+            Symbol::CubicMeterPerHour => "m³/h".to_string(),
+            Symbol::CubicMeterPerSec => "m³/s".to_string(),
+            Symbol::Yuan => "元".to_string(),
+        }
+    }
 }

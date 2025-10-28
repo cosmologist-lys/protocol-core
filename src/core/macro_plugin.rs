@@ -18,7 +18,6 @@ macro_rules! handle_int {
         // 4. 执行缩放 (如果需要)
         if $scale != 1.0 && $scale != 0.0 {
             // 假设 scale=1.0 表示不缩放
-            // 使用您提供的高精度除法，假设默认精度和小数位数
             let scaled_value =
                 math_util::multiply(6, DecimalRoundingMode::HalfUp, &[value_f64, $scale])?;
             Ok(scaled_value.to_string())
