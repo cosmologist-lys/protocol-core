@@ -1,3 +1,5 @@
+use chrono::Local;
+
 use crate::{
     defi::{
         ProtocolResult,
@@ -8,13 +10,18 @@ use crate::{
 
 /// 定义了 BCD 时间戳的格式化类型
 pub enum TimestampType {
-    Year,
-    YearMonth,
-    YearMonthDay,
-    YearMonthDayHour,
-    YearMonthDayHourMin,
-    YearMonthDayHourMinSec,
-    HourMinSec,
+    Year,                   //yyyy
+    YearMonth,              //yyyy-MM
+    YearMonthDay,           //yyyy-MM-dd
+    YearMonthDayHour,       //yyyy-MM-dd HH
+    YearMonthDayHourMin,    //yyyy-MM-dd HH:mm
+    YearMonthDayHourMinSec, //yyyy-MM-dd HH:mm:ss
+    HourMinSec,             //HH:mm:ss
+    YyyyMmDdHHmmss,         // yyyymmddHHmmss (4字节年)
+    YyyyMmDd,               // yyyymmdd (4字节年)
+    HHmmss,                 // HHmmss
+    YyMmDdHHmmss,           // yymmddHHmmss (2字节年)
+    YyMmDd,                 // yymmdd (2字节年)
 }
 
 const YEAR_PREFIX: &str = "20";
@@ -54,12 +61,43 @@ pub fn convert(bcd_bytes: &[u8], timestamp_type: TimestampType) -> ProtocolResul
         TimestampType::YearMonthDayHourMin => convert_to_year_month_day_hour_min(ts),
         TimestampType::YearMonthDayHourMinSec => convert_to_year_month_day_hour_min_sec(ts),
         TimestampType::HourMinSec => convert_to_hour_min_sec(ts),
+
+        TimestampType::YyyyMmDdHHmmss => convert_to_yyyymmddhhmmss(ts),
+        TimestampType::YyyyMmDd => convert_to_yyyymmdd(ts),
+        TimestampType::HHmmss => convert_to_hhmmss(ts),
+        TimestampType::YyMmDdHHmmss => convert_to_yymmddhhmmss(ts),
+        TimestampType::YyMmDd => convert_to_yymmdd(ts),
     };
 
     Ok(result)
 }
 
 // --- 公共 API 别名 ---
+
+pub fn now_to_timestamp(timestamp_type: TimestampType) -> ProtocolResult<String> {
+    // 2. 获取当前本地时间
+    let now = Local::now();
+
+    // 3. 根据类型选择 chrono 的格式化字符串
+    let format_string = match timestamp_type {
+        TimestampType::Year => "%Y",
+        TimestampType::YearMonth => "%Y-%m",
+        TimestampType::YearMonthDay => "%Y-%m-%d",
+        TimestampType::YearMonthDayHour => "%Y-%m-%d %H",
+        TimestampType::YearMonthDayHourMin => "%Y-%m-%d %H:%M",
+        TimestampType::YearMonthDayHourMinSec => "%Y-%m-%d %H:%M:%S",
+        TimestampType::HourMinSec => "%H:%M:%S",
+        TimestampType::YyyyMmDdHHmmss => "%Y%m%d%H%M%S",
+        TimestampType::YyyyMmDd => "%Y%m%d",
+        TimestampType::HHmmss => "%H%M%S",
+        TimestampType::YyMmDdHHmmss => "%y%m%d%H%M%S", // %y 代表两位数年份
+        TimestampType::YyMmDd => "%y%m%d",             // %y 代表两位数年份
+    };
+
+    // 4. 格式化并返回
+    // chrono 的 format 不会轻易失败，除非格式字符串本身有问题（这里不会）
+    Ok(now.format(format_string).to_string())
+}
 
 pub fn to_year(bcd_bytes: &[u8]) -> ProtocolResult<String> {
     convert(bcd_bytes, TimestampType::Year)
@@ -81,6 +119,71 @@ pub fn to_year_month_day_hour_min_sec(bcd_bytes: &[u8]) -> ProtocolResult<String
 }
 pub fn to_hour_min_sec(bcd_bytes: &[u8]) -> ProtocolResult<String> {
     convert(bcd_bytes, TimestampType::HourMinSec)
+}
+
+pub fn to_yyyymmddhhmmss(bcd_bytes: &[u8]) -> ProtocolResult<String> {
+    convert(bcd_bytes, TimestampType::YyyyMmDdHHmmss)
+}
+pub fn to_yyyymmdd(bcd_bytes: &[u8]) -> ProtocolResult<String> {
+    convert(bcd_bytes, TimestampType::YyyyMmDd)
+}
+pub fn to_hhmmss(bcd_bytes: &[u8]) -> ProtocolResult<String> {
+    convert(bcd_bytes, TimestampType::HHmmss)
+}
+pub fn to_yymmddhhmmss(bcd_bytes: &[u8]) -> ProtocolResult<String> {
+    convert(bcd_bytes, TimestampType::YyMmDdHHmmss)
+}
+pub fn to_yymmdd(bcd_bytes: &[u8]) -> ProtocolResult<String> {
+    convert(bcd_bytes, TimestampType::YyMmDd)
+}
+
+// 转换 "yymmddHHmmss" -> "yyyymmddHHmmss"
+fn convert_to_yyyymmddhhmmss(timestamp: &str) -> String {
+    if timestamp.len() >= 12 {
+        let yy = &timestamp[0..2];
+        let rest = &timestamp[2..12]; // mmddHHmmss
+        format!("{}{}{}", YEAR_PREFIX, yy, rest)
+    } else {
+        timestamp.to_string() // 长度不足，返回原样
+    }
+}
+
+// 转换 "yymmdd" -> "yyyymmdd"
+fn convert_to_yyyymmdd(timestamp: &str) -> String {
+    if timestamp.len() >= 6 {
+        let yy = &timestamp[0..2];
+        let rest = &timestamp[2..6]; // mmdd
+        format!("{}{}{}", YEAR_PREFIX, yy, rest)
+    } else {
+        timestamp.to_string()
+    }
+}
+
+// 转换 "HHmmss" -> "HHmmss" (直接截取或返回原样)
+fn convert_to_hhmmss(timestamp: &str) -> String {
+    if timestamp.len() >= 6 {
+        timestamp[0..6].to_string()
+    } else {
+        timestamp.to_string()
+    }
+}
+
+// 转换 "yymmddHHmmss" -> "yymmddHHmmss" (直接截取或返回原样)
+fn convert_to_yymmddhhmmss(timestamp: &str) -> String {
+    if timestamp.len() >= 12 {
+        timestamp[0..12].to_string()
+    } else {
+        timestamp.to_string()
+    }
+}
+
+// 转换 "yymmdd" -> "yymmdd" (直接截取或返回原样)
+fn convert_to_yymmdd(timestamp: &str) -> String {
+    if timestamp.len() >= 6 {
+        timestamp[0..6].to_string()
+    } else {
+        timestamp.to_string()
+    }
 }
 
 // --- 私有辅助函数 ---

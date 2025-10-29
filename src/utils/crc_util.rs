@@ -18,8 +18,8 @@ pub fn calculate_from_bytes(crc_type: CrcType, bytes: &[u8]) -> ProtocolResult<u
 }
 
 pub fn compare_crc(crc1: &str, crc2: u16) -> ProtocolResult<()> {
-    let crc1_u16 = hex_util::hex_to_i32(crc1)?;
-    if crc1_u16.to_u16().unwrap() == crc2 {
+    let crc1_u16 = hex_util::hex_to_u16(crc1)?;
+    if crc1_u16 == crc2 {
         Ok(())
     } else {
         let mut temp = hex_util::hex_to_bytes(crc1)?;
