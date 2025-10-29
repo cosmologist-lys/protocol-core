@@ -32,6 +32,7 @@ pub struct RawCapsule<T: Cmd> {
     // 临时二进制存放处
     pub temp_bytes: Vec<u8>,
     pub direction: DirectionEnum,
+    pub success: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -55,6 +56,10 @@ pub trait Cmd: DynClone {
 
     fn msg_type(&self) -> Option<MsgTypeEnum> {
         Some(MsgTypeEnum::DeviceParamSetting)
+    }
+
+    fn is_success(&self) -> bool {
+        true
     }
 }
 

@@ -137,12 +137,6 @@ impl MsgTypeEnum {
     }
 }
 
-pub trait Command {
-    fn code(&self) -> String;
-
-    fn description(&self) -> String;
-}
-
 #[derive(Debug, Clone)]
 pub enum Symbol {
     Percent,

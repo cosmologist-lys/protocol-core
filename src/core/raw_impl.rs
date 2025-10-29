@@ -17,12 +17,12 @@ impl Rawfield {
         }
     }
 
-    pub fn new_with_hex(hex: &'static str, title: &str, value: &str) -> Self {
+    pub fn new_with_hex(hex: &str, title: &str, value: String) -> Self {
         Self {
             bytes: hex_util::hex_to_bytes(hex).unwrap(),
             title: title.into(),
             hex: hex.into(),
-            value: value.into(),
+            value,
         }
     }
 
@@ -59,20 +59,55 @@ impl<T: Cmd + 'static> RawCapsule<T> {
             device_id: None,
             temp_bytes: Vec::new(),
             direction: DirectionEnum::Upstream,
+            success: true,
         }
     }
 
-    pub fn new_downstream(up_stream_capsule: &RawCapsule<T>) -> Self {
+    pub fn new_downstream(cmd: T, device_no: &str, device_id: &str) -> Self {
+        Self {
+            bytes: Vec::new(),
+            hex: String::new(),
+            field_details: Vec::new(),
+            cmd: Some(cmd),
+            device_no: Some(device_no.into()),
+            device_id: Some(device_id.into()),
+            temp_bytes: Vec::new(),
+            direction: DirectionEnum::Downstream,
+            success: true,
+        }
+    }
+
+    pub fn new_downstream_from_upstream(up_stream_capsule: &RawCapsule<T>) -> Self {
+        let device_no = if up_stream_capsule.device_no.is_some() {
+            up_stream_capsule.device_no.clone()
+        } else {
+            None
+        };
+
+        let device_id = if up_stream_capsule.device_id.is_some() {
+            up_stream_capsule.device_id.clone()
+        } else {
+            None
+        };
         Self {
             bytes: Vec::new(),
             hex: String::new(),
             field_details: Vec::new(),
             cmd: up_stream_capsule.get_cmd_clone(),
-            device_no: up_stream_capsule.device_no.clone(),
-            device_id: up_stream_capsule.device_id.clone(),
+            device_no,
+            device_id,
             temp_bytes: Vec::new(),
             direction: DirectionEnum::Downstream,
+            success: true,
         }
+    }
+
+    pub fn fail(&mut self) {
+        self.success = false;
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.success
     }
 
     pub fn get_bytes_ref(&self) -> &[u8] {

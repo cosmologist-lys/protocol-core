@@ -211,8 +211,8 @@ impl<'a> Reader<'a> {
         self.current_field = Some(raw_field.clone());
         self.fields.push(raw_field);
 
-        // 5. 移动游标
-        self.pos += len;
+        // 5. 移动游标(crc通常在尾巴，是从后往前读，因此sop往前走)
+        self.sop -= len;
 
         // 6. 返回 &mut self
         Ok(self)
