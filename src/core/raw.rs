@@ -1,6 +1,5 @@
-use dyn_clone::DynClone;
-
 use crate::{CrcType, DirectionEnum, MsgTypeEnum, ReportField, core::RW};
+use dyn_clone::DynClone;
 
 // 报文帧字段 最小解析单位
 #[derive(Debug, Clone, Default)]
@@ -39,6 +38,55 @@ pub struct RawCapsule<T: Cmd> {
 pub struct RawChamber<T: Cmd> {
     pub upstream: Option<RawCapsule<T>>,
     pub downstream: Option<RawCapsule<T>>,
+}
+/// Trait 定义了缓存中设备状态对象需要实现的方法。
+/// 添加了 Clone, Send, Sync, 'static 约束以用于 moka 缓存。
+pub trait Transport: Send + Sync + 'static {
+    // 设备号(去除补位)
+    fn device_no(&self) -> String;
+
+    // 设备号(包含补位) - 可选，提供默认实现
+    fn device_no_padding(&self) -> String {
+        self.device_no() // 默认返回未补位的
+    }
+
+    // 协议版本(hex-string or bcd-string)
+    fn protocol_version(&self) -> String;
+
+    // 设备类型(hex-string or bcd-string)
+    fn device_type(&self) -> String;
+
+    // 厂商代码(hex-string or bcd-string)
+    fn factory_code(&self) -> String;
+
+    // 上行消息序号(每次上行+1)
+    fn upstream_count(&self) -> usize;
+
+    // 下行消息序号(每次下行+1)
+    fn downstream_count(&self) -> usize;
+
+    // 加密类型(-1表示不加密。0表示使用默认密钥。>=1表示使用对应的密钥)
+    fn cipher_slot(&self) -> i8 {
+        -1 // 提供默认实现
+    }
+
+    // 是否使用加密
+    fn use_cipher(&self) -> bool {
+        self.cipher_slot() >= 0
+    }
+}
+
+// 派生 Clone 是最简单的满足 moka 要求的方式
+#[derive(Debug, Clone)]
+pub struct TransportCarrier {
+    pub(in crate::core) device_no: String,
+    pub(in crate::core) device_no_padding: String,
+    pub(in crate::core) protocol_version: String,
+    pub(in crate::core) device_type: String,
+    pub(in crate::core) factory_code: String,
+    pub(in crate::core) upstream_count: usize,
+    pub(in crate::core) downstream_count: usize,
+    pub(in crate::core) cipher_slot: i8,
 }
 
 pub trait Cmd: DynClone {

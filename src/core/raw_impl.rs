@@ -1,8 +1,9 @@
 use dyn_clone::DynClone;
 
 use crate::{
-    DirectionEnum, ReportField,
-    core::raw::{Cmd, PlaceHolder, RawCapsule, RawChamber, Rawfield},
+    DirectionEnum, ProtocolError, ProtocolResult, ReportField,
+    core::raw::{Cmd, PlaceHolder, RawCapsule, RawChamber, Rawfield, Transport, TransportCarrier},
+    md5_digester::Md5Digester,
     utils::hex_util,
 };
 
@@ -75,6 +76,29 @@ impl<T: Cmd + 'static> RawCapsule<T> {
             direction: DirectionEnum::Downstream,
             success: true,
         }
+    }
+
+    // 获取一个唯一值。它由device_id和device_no一起组成进行md5加密
+    pub fn get_unique_id(&self) -> ProtocolResult<String> {
+        let device_no = if let Some(dn) = self.device_no.as_ref() {
+            dn.clone()
+        } else {
+            "0".into()
+        };
+
+        let device_id = if let Some(dn) = self.device_id.as_ref() {
+            dn.clone()
+        } else {
+            "0".into()
+        };
+
+        if device_no == "0" && device_id == "0" {
+            return Err(ProtocolError::CommonError(
+                "RawCapsule requires at least 1 of device_no and device_id but found both none"
+                    .into(),
+            ));
+        }
+        Md5Digester::digest_str_with_salt(&device_no, &device_id)
     }
 
     pub fn new_downstream_from_upstream(up_stream_capsule: &RawCapsule<T>) -> Self {
@@ -162,6 +186,12 @@ impl<T: Cmd + 'static> RawCapsule<T> {
     pub fn append_fields(&mut self, fields: Vec<ReportField>) {
         self.field_details.extend(fields);
     }
+
+    pub fn prepend_fields(&mut self, fields: Vec<ReportField>) {
+        let mut new_fields = fields;
+        new_fields.append(&mut self.field_details);
+        self.field_details = new_fields;
+    }
 }
 
 impl<T: Cmd> RawChamber<T> {
@@ -178,5 +208,78 @@ impl<T: Cmd> RawChamber<T> {
 
     pub fn update_downstream(&mut self, downstream: RawCapsule<T>) {
         self.downstream = Some(downstream);
+    }
+}
+
+impl TransportCarrier {
+    pub fn new(device_no: &str, device_no_padding: &str) -> Self {
+        Self {
+            device_no: device_no.to_string(),
+            device_no_padding: device_no_padding.to_string(),
+            protocol_version: "00".to_string(), // 示例值
+            device_type: "07".to_string(),      // 示例值
+            factory_code: "0000".to_string(),   // 示例值
+            upstream_count: 0,
+            downstream_count: 0,
+            cipher_slot: -1,
+        }
+    }
+
+    pub fn set_protocol_version(&mut self, version: &str) {
+        self.protocol_version = version.to_string();
+    }
+
+    pub fn set_device_type(&mut self, device_type: &str) {
+        self.device_type = device_type.to_string();
+    }
+
+    pub fn set_factory_code(&mut self, factory_code: &str) {
+        self.factory_code = factory_code.to_string();
+    }
+
+    pub fn set_cipher_slot(&mut self, cipher_slot: i8) {
+        self.cipher_slot = cipher_slot;
+    }
+
+    pub fn set_upstream_count(&mut self, count: usize) {
+        self.upstream_count = count;
+    }
+
+    pub fn set_downstream_count(&mut self, count: usize) {
+        self.downstream_count = count;
+    }
+}
+
+impl Transport for TransportCarrier {
+    fn device_no(&self) -> String {
+        self.device_no.clone()
+    }
+
+    fn device_no_padding(&self) -> String {
+        self.device_no_padding.clone()
+    }
+
+    fn protocol_version(&self) -> String {
+        self.protocol_version.clone()
+    }
+
+    fn device_type(&self) -> String {
+        self.device_type.clone()
+    }
+
+    fn factory_code(&self) -> String {
+        self.factory_code.clone()
+    }
+
+    fn upstream_count(&self) -> usize {
+        self.upstream_count
+    }
+
+    fn downstream_count(&self) -> usize {
+        self.downstream_count
+    }
+
+    fn cipher_slot(&self) -> i8 {
+        self.cipher_slot
     }
 }
