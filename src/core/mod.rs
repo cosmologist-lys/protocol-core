@@ -1,6 +1,7 @@
 use crate::defi::{ProtocolResult, error::ProtocolError};
 use serde::{Deserialize, Serialize};
 
+pub mod cache;
 mod macro_plugin;
 pub mod raw;
 pub mod raw_impl;
