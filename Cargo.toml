@@ -9,10 +9,13 @@ base64 = "0.22.1"
 chrono = "0.4.42"
 cipher = { version = "0.4.4", features = ["block-padding"] }
 crc = "3.3.0"
+dyn-clone = "1.0.20"
 ecb = "0.1.2"
 getset = "0.1.6"
 hex = "0.4.3"
 md5 = "0.8.0"
+moka = { version = "0.12.11", features = ["sync"] }
+once_cell = "1.21.3"
 pinyin = "0.10.0"
 rand = "0.9.2"
 rust_decimal = "1.39.0"
@@ -20,3 +23,11 @@ rust_decimal_macros = "1.39.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 thiserror = "2.0.17"
+
+[lib]
+# rlib	Rust 专用静态库，包含元数据，仅支持 Rust 项目间依赖。	Rust 内部库依赖、纯 Rust 项目的代码复用。	libxxx.rlib
+# dylib	Rust 动态库，仅支持 Rust 程序调用（依赖 Rust 运行时）。	Rust 生态内的动态库场景（较少用，通常优先选 cdylib 或 staticlib）。	Linux: libxxx.so macOS: libxxx.dylib Windows: xxx.dll
+# cdylib	C 兼容动态库，可被其他语言（如 C、Python）通过 FFI 调用。	跨语言交互（如 Rust 编写的库供 C++ 程序调用）。	同 dylib 示例
+# staticlib	静态库，将所有依赖编译进单个文件，无外部依赖。	给非 Rust 项目提供独立库（如嵌入到 C 程序中）。	Linux: libxxx.a macOS: libxxx.a Windows: xxx.lib
+# proc-macro	过程宏库，用于定义自定义宏（如派生宏、属性宏）。	开发 Rust 过程宏插件。	无单独文件（编译为特殊格式供编译器加载）
+crate-type = ["rlib"]
