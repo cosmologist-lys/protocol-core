@@ -102,7 +102,7 @@ impl Writer {
     ///
     /// # Returns
     /// * `Ok(usize)` - 占位符在 `buffer` 中的起始字节位置 (pos)。
-    pub fn write_placeholder(&mut self, tag: &str, byte_len: usize) -> ProtocolResult<usize> {
+    pub fn write_placeholder(&mut self, tag: &str, byte_len: usize) -> ProtocolResult<&mut Self> {
         // 1. 记住当前位置 (即写入前的 buffer 长度)
         let start_pos = self.buffer.len();
 
@@ -124,7 +124,7 @@ impl Writer {
         self.placeholders.insert(tag.into(), placeholder);
 
         // 4. 返回写入的起始位置
-        Ok(start_pos)
+        Ok(self)
     }
 
     /// 在缓冲区的指定位置“覆写” (Patch/Overwrite) 字节。

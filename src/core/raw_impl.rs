@@ -2,7 +2,10 @@ use dyn_clone::DynClone;
 
 use crate::{
     DirectionEnum, ProtocolError, ProtocolResult, ReportField,
-    core::raw::{Cmd, PlaceHolder, RawCapsule, RawChamber, Rawfield, Transport, TransportCarrier},
+    core::raw::{
+        Cmd, PlaceHolder, RawCapsule, RawChamber, Rawfield, Transport, TransportCarrier,
+        TransportPair,
+    },
     md5_digester::Md5Digester,
     utils::hex_util,
 };
@@ -211,72 +214,145 @@ impl<T: Cmd> RawChamber<T> {
     }
 }
 
+impl TransportPair {
+    pub fn new(hex: String, bytes: Vec<u8>) -> Self {
+        Self { hex, bytes }
+    }
+
+    pub fn set_hex(&mut self, hex: &str) {
+        self.hex = hex.into();
+    }
+
+    pub fn set_bytes(&mut self, bytes: &[u8]) {
+        self.bytes = bytes.into();
+    }
+
+    pub fn get_hex_clone(&self) -> String {
+        self.hex.clone()
+    }
+
+    pub fn get_bytes_clone(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+}
+
 impl TransportCarrier {
-    pub fn new(device_no: &str, device_no_padding: &str) -> Self {
+    pub fn new_with_device_no(
+        device_no: &str,
+        device_no_bytes: &[u8],
+        device_no_padding: &str,
+        device_no_padding_bytes: &[u8],
+    ) -> Self {
         Self {
-            device_no: device_no.to_string(),
-            device_no_padding: device_no_padding.to_string(),
-            protocol_version: "00".to_string(), // 示例值
-            device_type: "07".to_string(),      // 示例值
-            factory_code: "0000".to_string(),   // 示例值
-            upstream_count: 0,
-            downstream_count: 0,
+            device_no: Some(TransportPair::new(device_no.into(), device_no_bytes.into())),
+            device_no_padding: Some(TransportPair::new(
+                device_no_padding.into(),
+                device_no_padding_bytes.into(),
+            )),
+            protocol_version: None,
+            device_type: None,
+            factory_code: None,
+            upstream_count: None,
+            downstream_count: None,
             cipher_slot: -1,
         }
     }
 
-    pub fn set_protocol_version(&mut self, version: &str) {
-        self.protocol_version = version.to_string();
+    pub fn set_device_no(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_device_no(Some(tp));
     }
 
-    pub fn set_device_type(&mut self, device_type: &str) {
-        self.device_type = device_type.to_string();
+    fn _set_device_no(&mut self, device_no: Option<TransportPair>) {
+        self.device_no = device_no;
     }
 
-    pub fn set_factory_code(&mut self, factory_code: &str) {
-        self.factory_code = factory_code.to_string();
+    pub fn set_device_no_padding(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_device_no_padding(Some(tp));
+    }
+
+    fn _set_device_no_padding(&mut self, device_no_padding: Option<TransportPair>) {
+        self.device_no_padding = device_no_padding;
+    }
+
+    pub fn set_protocol_version(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_protocol_version(Some(tp));
+    }
+
+    fn _set_protocol_version(&mut self, version: Option<TransportPair>) {
+        self.protocol_version = version;
+    }
+
+    pub fn set_device_type(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_device_type(Some(tp));
+    }
+
+    fn _set_device_type(&mut self, device_type: Option<TransportPair>) {
+        self.device_type = device_type;
+    }
+
+    pub fn set_factory_code(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_factory_code(Some(tp));
+    }
+
+    fn _set_factory_code(&mut self, factory_code: Option<TransportPair>) {
+        self.factory_code = factory_code;
     }
 
     pub fn set_cipher_slot(&mut self, cipher_slot: i8) {
         self.cipher_slot = cipher_slot;
     }
 
-    pub fn set_upstream_count(&mut self, count: usize) {
+    pub fn set_upstream_count(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_upstream_count(Some(tp));
+    }
+
+    fn _set_upstream_count(&mut self, count: Option<TransportPair>) {
         self.upstream_count = count;
     }
 
-    pub fn set_downstream_count(&mut self, count: usize) {
+    pub fn set_downstream_count(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_downstream_count(Some(tp));
+    }
+
+    fn _set_downstream_count(&mut self, count: Option<TransportPair>) {
         self.downstream_count = count;
     }
 }
 
 impl Transport for TransportCarrier {
-    fn device_no(&self) -> String {
+    fn device_no(&self) -> Option<TransportPair> {
         self.device_no.clone()
     }
 
-    fn device_no_padding(&self) -> String {
+    fn device_no_padding(&self) -> Option<TransportPair> {
         self.device_no_padding.clone()
     }
 
-    fn protocol_version(&self) -> String {
+    fn protocol_version(&self) -> Option<TransportPair> {
         self.protocol_version.clone()
     }
 
-    fn device_type(&self) -> String {
+    fn device_type(&self) -> Option<TransportPair> {
         self.device_type.clone()
     }
 
-    fn factory_code(&self) -> String {
+    fn factory_code(&self) -> Option<TransportPair> {
         self.factory_code.clone()
     }
 
-    fn upstream_count(&self) -> usize {
-        self.upstream_count
+    fn upstream_count(&self) -> Option<TransportPair> {
+        self.upstream_count.clone()
     }
 
-    fn downstream_count(&self) -> usize {
-        self.downstream_count
+    fn downstream_count(&self) -> Option<TransportPair> {
+        self.downstream_count.clone()
     }
 
     fn cipher_slot(&self) -> i8 {

@@ -39,31 +39,32 @@ pub struct RawChamber<T: Cmd> {
     pub upstream: Option<RawCapsule<T>>,
     pub downstream: Option<RawCapsule<T>>,
 }
+
 /// Trait 定义了缓存中设备状态对象需要实现的方法。
 /// 添加了 Clone, Send, Sync, 'static 约束以用于 moka 缓存。
 pub trait Transport: Send + Sync + 'static {
     // 设备号(去除补位)
-    fn device_no(&self) -> String;
+    fn device_no(&self) -> Option<TransportPair>;
 
     // 设备号(包含补位) - 可选，提供默认实现
-    fn device_no_padding(&self) -> String {
+    fn device_no_padding(&self) -> Option<TransportPair> {
         self.device_no() // 默认返回未补位的
     }
 
     // 协议版本(hex-string or bcd-string)
-    fn protocol_version(&self) -> String;
+    fn protocol_version(&self) -> Option<TransportPair>;
 
     // 设备类型(hex-string or bcd-string)
-    fn device_type(&self) -> String;
+    fn device_type(&self) -> Option<TransportPair>;
 
     // 厂商代码(hex-string or bcd-string)
-    fn factory_code(&self) -> String;
+    fn factory_code(&self) -> Option<TransportPair>;
 
     // 上行消息序号(每次上行+1)
-    fn upstream_count(&self) -> usize;
+    fn upstream_count(&self) -> Option<TransportPair>;
 
     // 下行消息序号(每次下行+1)
-    fn downstream_count(&self) -> usize;
+    fn downstream_count(&self) -> Option<TransportPair>;
 
     // 加密类型(-1表示不加密。0表示使用默认密钥。>=1表示使用对应的密钥)
     fn cipher_slot(&self) -> i8 {
@@ -76,16 +77,23 @@ pub trait Transport: Send + Sync + 'static {
     }
 }
 
-// 派生 Clone 是最简单的满足 moka 要求的方式
-#[derive(Debug, Clone)]
+// hex + bytes
+#[derive(Debug, Clone, Default)]
+pub struct TransportPair {
+    pub(in crate::core) hex: String,
+    pub(in crate::core) bytes: Vec<u8>,
+}
+
+// informations with hex + bytes
+#[derive(Debug, Clone, Default)]
 pub struct TransportCarrier {
-    pub(in crate::core) device_no: String,
-    pub(in crate::core) device_no_padding: String,
-    pub(in crate::core) protocol_version: String,
-    pub(in crate::core) device_type: String,
-    pub(in crate::core) factory_code: String,
-    pub(in crate::core) upstream_count: usize,
-    pub(in crate::core) downstream_count: usize,
+    pub(in crate::core) device_no: Option<TransportPair>,
+    pub(in crate::core) device_no_padding: Option<TransportPair>,
+    pub(in crate::core) protocol_version: Option<TransportPair>,
+    pub(in crate::core) device_type: Option<TransportPair>,
+    pub(in crate::core) factory_code: Option<TransportPair>,
+    pub(in crate::core) upstream_count: Option<TransportPair>,
+    pub(in crate::core) downstream_count: Option<TransportPair>,
     pub(in crate::core) cipher_slot: i8,
 }
 

@@ -2,7 +2,10 @@ use std::ptr::read;
 
 use crate::{
     core::{raw::Rawfield, reader::Reader},
-    defi::ProtocolResult,
+    defi::{
+        ProtocolResult,
+        error::{ProtocolError, comm_error::CommError, hex_digest_error::ProtocolDigestError},
+    },
     digester::aes_digester::{AesCipher, AesMode},
     utils::{crc_util, hex_util},
 };
@@ -26,11 +29,21 @@ fn test_hex() -> ProtocolResult<()> {
     reader
         .read_and_translate_head(1, |h| {
             let value = hex_util::bytes_to_hex(h)?;
+            if h[0] != 0x68 {
+                return Err(ProtocolError::ProtocolDigestError(
+                    ProtocolDigestError::InvalidHead,
+                ));
+            }
             let rf = Rawfield::new(h, "head", value.as_str());
             Ok(rf)
         })?
         .read_and_translate_tail(1, |h| {
             let value = hex_util::bytes_to_hex(h)?;
+            if h[0] != 0x16 {
+                return Err(ProtocolError::ProtocolDigestError(
+                    ProtocolDigestError::InvalidHead,
+                ));
+            }
             let rf = Rawfield::new(h, "tail", value.as_str());
             Ok(rf)
         })?
