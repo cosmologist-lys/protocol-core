@@ -249,6 +249,9 @@ impl TransportCarrier {
                 device_no_padding.into(),
                 device_no_padding_bytes.into(),
             )),
+            device_no_length: None,
+            control_field: None,
+            report_type: None,
             protocol_version: None,
             device_type: None,
             factory_code: None,
@@ -256,6 +259,33 @@ impl TransportCarrier {
             downstream_count: None,
             cipher_slot: -1,
         }
+    }
+
+    pub fn set_device_no_length(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_device_no_length(Some(tp));
+    }
+
+    fn _set_device_no_length(&mut self, device_no_length: Option<TransportPair>) {
+        self.device_no_length = device_no_length;
+    }
+
+    pub fn set_report_type(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_report_type(Some(tp));
+    }
+
+    fn _set_report_type(&mut self, report_type: Option<TransportPair>) {
+        self.report_type = report_type;
+    }
+
+    pub fn set_control_field(&mut self, hex: String, bytes: Vec<u8>) {
+        let tp = TransportPair::new(hex, bytes);
+        self._set_control_field(Some(tp));
+    }
+
+    fn _set_control_field(&mut self, control_field: Option<TransportPair>) {
+        self.control_field = control_field;
     }
 
     pub fn set_device_no(&mut self, hex: String, bytes: Vec<u8>) {
@@ -333,6 +363,18 @@ impl Transport for TransportCarrier {
 
     fn device_no_padding(&self) -> Option<TransportPair> {
         self.device_no_padding.clone()
+    }
+
+    fn device_no_length(&self) -> Option<TransportPair> {
+        self.device_no_length.clone()
+    }
+
+    fn report_type(&self) -> Option<TransportPair> {
+        self.report_type.clone()
+    }
+
+    fn control_field(&self) -> Option<TransportPair> {
+        self.control_field.clone()
     }
 
     fn protocol_version(&self) -> Option<TransportPair> {

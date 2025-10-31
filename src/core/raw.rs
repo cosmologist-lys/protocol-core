@@ -51,6 +51,15 @@ pub trait Transport: Send + Sync + 'static {
         self.device_no() // 默认返回未补位的
     }
 
+    // 设备号长度(hex-string or bcd-string)
+    fn device_no_length(&self) -> Option<TransportPair>;
+
+    // 上报类型
+    fn report_type(&self) -> Option<TransportPair>;
+
+    // 控制码
+    fn control_field(&self) -> Option<TransportPair>;
+
     // 协议版本(hex-string or bcd-string)
     fn protocol_version(&self) -> Option<TransportPair>;
 
@@ -89,7 +98,10 @@ pub struct TransportPair {
 pub struct TransportCarrier {
     pub(in crate::core) device_no: Option<TransportPair>,
     pub(in crate::core) device_no_padding: Option<TransportPair>,
+    pub(in crate::core) device_no_length: Option<TransportPair>,
     pub(in crate::core) protocol_version: Option<TransportPair>,
+    pub(in crate::core) report_type: Option<TransportPair>,
+    pub(in crate::core) control_field: Option<TransportPair>,
     pub(in crate::core) device_type: Option<TransportPair>,
     pub(in crate::core) factory_code: Option<TransportPair>,
     pub(in crate::core) upstream_count: Option<TransportPair>,
