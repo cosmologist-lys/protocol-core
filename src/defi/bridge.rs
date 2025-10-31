@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::{parts::rawfield::Rawfield, MsgTypeEnum}, utils, Cmd, ProtocolError, ProtocolResult, RawChamber
+    Cmd, ProtocolError, ProtocolResult, RawChamber,
+    core::{MsgTypeEnum, parts::rawfield::Rawfield},
+    utils,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -46,7 +48,7 @@ pub struct JarDecodeResponse {
     pub success: bool,
     pub cmd_code: String,
     pub field_details: Vec<ReportField>,
-    pub rsp_field_detail: Vec<ReportField>,
+    pub rsp_field_details: Vec<ReportField>,
     // 这才是最终要下行的数据hex
     pub rsp_data: String,
 }
@@ -68,7 +70,7 @@ impl JarDecodeResponse {
             success: chamber.success,
             cmd_code: chamber.cmd_code.clone(),
             field_details: request_field_details,
-            rsp_field_detail: response_field_details,
+            rsp_field_details: response_field_details,
             rsp_data: response_hex,
         }
     }

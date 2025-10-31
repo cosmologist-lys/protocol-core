@@ -72,7 +72,7 @@ impl AesCipher {
 
     // ECB模式解密
     fn decrypt_ecb(&self, data: &[u8]) -> Result<Vec<u8>, &'static str> {
-        if data.len() % 16 != 0 {
+        if !data.len().is_multiple_of(16) {
             return Err("Data length must be multiple of 16 bytes");
         }
 
@@ -118,7 +118,7 @@ impl AesCipher {
         if iv.len() != 16 {
             return Err("IV must be 16 bytes");
         }
-        if data.len() % 16 != 0 {
+        if !data.len().is_multiple_of(16) {
             return Err("Data length must be multiple of 16 bytes");
         }
 
@@ -127,7 +127,7 @@ impl AesCipher {
 
         for chunk in data.chunks(16) {
             let mut block = GenericArray::clone_from_slice(chunk);
-            let current_block = block.clone();
+            let current_block = block;
 
             self.cipher.decrypt_block(&mut block);
 
@@ -153,7 +153,7 @@ impl AesCipher {
         let mut feedback = GenericArray::clone_from_slice(iv);
 
         for chunk in data.chunks(16) {
-            let mut block = feedback.clone();
+            let mut block = feedback;
             self.cipher.encrypt_block(&mut block);
 
             let mut output = Vec::with_capacity(chunk.len());
@@ -185,7 +185,7 @@ impl AesCipher {
         let mut feedback = GenericArray::clone_from_slice(iv);
 
         for chunk in data.chunks(16) {
-            let mut block = feedback.clone();
+            let mut block = feedback;
             self.cipher.encrypt_block(&mut block);
 
             let mut output = Vec::with_capacity(chunk.len());
@@ -217,7 +217,7 @@ impl AesCipher {
         let mut counter = u128::from_be_bytes(iv.try_into().unwrap());
 
         for chunk in data.chunks(16) {
-            let mut nonce = counter.to_be_bytes();
+            let nonce = counter.to_be_bytes();
             let mut block = GenericArray::clone_from_slice(&nonce);
             self.cipher.encrypt_block(&mut block);
 
@@ -247,9 +247,9 @@ impl AesCipher {
         let mut feedback = GenericArray::clone_from_slice(iv);
 
         for chunk in data.chunks(16) {
-            let mut block = feedback.clone();
+            let mut block = feedback;
             self.cipher.encrypt_block(&mut block);
-            feedback = block.clone();
+            feedback = block;
 
             for (i, &byte) in chunk.iter().enumerate() {
                 result.push(byte ^ block[i]);
@@ -270,7 +270,7 @@ impl AesCipher {
         if iv.len() != 16 {
             return Err("IV must be 16 bytes");
         }
-        if data.len() % 16 != 0 {
+        if !data.len().is_multiple_of(16) {
             return Err("Data length must be multiple of 16 bytes");
         }
 
@@ -280,7 +280,7 @@ impl AesCipher {
 
         for chunk in data.chunks(16) {
             let mut block = GenericArray::clone_from_slice(chunk);
-            let current_cipher = block.clone();
+            let current_cipher = block;
 
             self.cipher.decrypt_block(&mut block);
 
@@ -437,8 +437,8 @@ impl AesCipher {
         }
 
         // Verify padding bytes
-        for i in (data.len() - padding_len)..data.len() {
-            if data[i] != padding_byte {
+        for &byte in &data[data.len() - padding_len..] {
+            if byte != padding_byte {
                 return Err("Invalid padding");
             }
         }
@@ -450,7 +450,7 @@ impl AesCipher {
 // 工具函数：生成随机IV
 pub fn generate_iv() -> [u8; 16] {
     let mut iv = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut iv);
+    rand::rng().fill_bytes(&mut iv);
     iv
 }
 
