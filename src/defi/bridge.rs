@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::{MsgTypeEnum, parts::rawfield::Rawfield},
-    utils,
+    core::{parts::rawfield::Rawfield, MsgTypeEnum}, utils, Cmd, ProtocolError, ProtocolResult, RawChamber
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -50,6 +49,34 @@ pub struct JarDecodeResponse {
     pub rsp_field_detail: Vec<ReportField>,
     // 这才是最终要下行的数据hex
     pub rsp_data: String,
+}
+
+impl JarDecodeResponse {
+    pub fn from_chamber<T: Cmd + Clone>(chamber: &RawChamber<T>) -> Self {
+        let request_field_details = if let Some(upstream) = &chamber.upstream {
+            upstream.field_details.clone()
+        } else {
+            Vec::new()
+        };
+
+        let (response_field_details, response_hex) = if let Some(downstream) = &chamber.downstream {
+            (downstream.field_details.clone(), downstream.hex.clone())
+        } else {
+            (Vec::new(), String::new())
+        };
+        Self {
+            success: chamber.success,
+            cmd_code: chamber.cmd_code.clone(),
+            field_details: request_field_details,
+            rsp_field_detail: response_field_details,
+            rsp_data: response_hex,
+        }
+    }
+    pub fn to_bytes(&self) -> ProtocolResult<Vec<u8>> {
+        let json_string =
+            serde_json::to_string(self).map_err(|e| ProtocolError::CommonError(e.to_string()))?;
+        Ok(json_string.into_bytes())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
