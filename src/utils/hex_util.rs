@@ -8,9 +8,9 @@ use std::{fmt::LowerHex, mem::size_of}; // 引入 size_of
 
 /// 将 Hex 字符串解码为字节向量。
 pub fn hex_to_bytes(s: &str) -> ProtocolResult<Vec<u8>> {
-    let cleaned = _clean_hex_str(s);
-    // hex::decode 会处理奇数长度和非法字符
-    hex::decode(cleaned).map_err(|e| {
+    let cleaned = _clean_and_pad_hex_str(s);
+    // hex::decode 会处理非法字符
+    hex::decode(&cleaned).map_err(|e| {
         ProtocolError::HexError(HexError::HexParseError {
             context: "bytes",
             reason: e.to_string(),
@@ -709,12 +709,12 @@ pub fn is_bcd(s: &str) -> bool {
 
 /// 检查字符串是否为有效的 Hex 码 (偶数长度, 0-9, a-f, A-F)
 pub fn is_hex(s: &str) -> bool {
-    hex::decode(_clean_hex_str(s)).is_ok()
+    hex::decode(_clean_and_pad_hex_str(s)).is_ok()
 }
 
 /// 检查字符串是否为有效的 ASCII (Hex) 码
 pub fn is_ascii_hex(s: &str) -> bool {
-    match hex::decode(_clean_hex_str(s)) {
+    match hex::decode(_clean_and_pad_hex_str(s)) {
         Ok(bytes) => bytes.iter().all(|b| b.is_ascii()),
         Err(_) => false,
     }
@@ -756,12 +756,12 @@ pub fn ensure_is_ascii_hex(s: &str) -> ProtocolResult<()> {
 
 /// ASCII Hex -> String
 pub fn ascii_to_string(ascii_hex_str: &str) -> ProtocolResult<String> {
-    let v = _clean_hex_str(ascii_hex_str);
+    let v = _clean_and_pad_hex_str(ascii_hex_str);
     if v.is_empty() {
         return Ok(String::new());
     }
-    ensure_is_ascii_hex(v)?;
-    let bytes = hex::decode(v).unwrap(); // 安全，已检查
+    ensure_is_ascii_hex(&v)?;
+    let bytes = hex::decode(&v).unwrap(); // 安全，已检查
     // from_utf8 在这里也是安全的，因为我们保证了是ASCII
     Ok(String::from_utf8(bytes).unwrap())
 }
@@ -787,4 +787,14 @@ fn _clean_hex_str(hex: &str) -> &str {
         .strip_prefix("0x")
         .or_else(|| hex.trim().strip_prefix("0X"))
         .unwrap_or_else(|| hex.trim())
+}
+
+/// 辅助函数：清理 hex 字符串并补零到偶数长度
+fn _clean_and_pad_hex_str(hex: &str) -> String {
+    let cleaned = _clean_hex_str(hex);
+    if cleaned.len().is_multiple_of(2) {
+        cleaned.to_string()
+    } else {
+        format!("0{}", cleaned)
+    }
 }
