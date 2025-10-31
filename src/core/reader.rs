@@ -5,7 +5,7 @@ use crate::{
 };
 
 /// 状态化的字节读取器，用于解析并收集 `Rawfield`。
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Reader<'a> {
     buffer: &'a [u8], // 借用原始报文，零拷贝读取
     pos: usize,       // 头部游标 (从0开始, 向前推进)
@@ -284,10 +284,5 @@ impl<'a> Reader<'a> {
         let crc_bytes = self.read_by_index_not_move(crc_pos_start_index, crc_pos_end_index);
         checker(expected_calc_crc_fields?, crc_bytes?)?;
         Ok(self)
-    }
-
-    /// 5. 转化翻译结果 -> 返回所有收集到的 Rawfield 这个方法会消耗Reader，表示解析已完成
-    pub fn into_fields(self) -> ProtocolResult<Vec<Rawfield>> {
-        Ok(self.fields)
     }
 }

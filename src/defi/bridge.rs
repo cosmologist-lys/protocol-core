@@ -48,7 +48,6 @@ pub struct JarDecodeResponse {
     pub cmd_code: String,
     pub field_details: Vec<ReportField>,
     pub rsp_field_detail: Vec<ReportField>,
-    pub jar_size: u64,
     // 这才是最终要下行的数据hex
     pub rsp_data: String,
 }

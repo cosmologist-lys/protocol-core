@@ -141,6 +141,13 @@ impl<T: Cmd + 'static> RawCapsule<T> {
         &self.bytes
     }
 
+    // 把二进制塞回去，同时自动生成hex,通常用于出口的capsule
+    pub fn set_bytes_and_generate_hex(&mut self, bytes: &[u8]) -> ProtocolResult<()> {
+        self.bytes = bytes.to_vec();
+        self.hex = hex_util::bytes_to_hex(bytes)?;
+        Ok(())
+    }
+
     pub fn is_upstream(&self) -> bool {
         self.direction.is_upstream()
     }
