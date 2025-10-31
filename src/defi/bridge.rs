@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::{MsgTypeEnum, raw::Rawfield},
+    core::{MsgTypeEnum, parts::rawfield::Rawfield},
     utils,
 };
 

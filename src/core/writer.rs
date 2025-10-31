@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    core::raw::{PlaceHolder, Rawfield},
+    core::parts::{placeholder::PlaceHolder, rawfield::Rawfield},
     defi::{ProtocolResult, bridge::ReportField, crc_enum::CrcType, error::ProtocolError},
     utils::{crc_util, hex_util},
 };

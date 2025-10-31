@@ -1,5 +1,5 @@
 use crate::{
-    core::raw::Rawfield,
+    core::parts::rawfield::Rawfield,
     defi::{ProtocolResult, bridge::ReportField, crc_enum::CrcType, error::ProtocolError},
     utils::{crc_util, hex_util},
 };

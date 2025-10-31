@@ -5,9 +5,14 @@ pub mod utils;
 
 pub use crate::core::{
     DirectionEnum, MsgTypeEnum, Symbol, cache,
-    raw::{
-        Cmd, PlaceHolder, ProtocolConfig, RawCapsule, RawChamber, Rawfield, Transport,
-        TransportCarrier,
+    parts::{
+        placeholder::PlaceHolder,
+        raw_capsule::RawCapsule,
+        raw_chamber::RawChamber,
+        rawfield::Rawfield,
+        traits::{Cmd, ProtocolConfig, Transport},
+        transport_carrier::TransportCarrier,
+        transport_pair::TransportPair,
     },
     reader::Reader,
     type_converter::{

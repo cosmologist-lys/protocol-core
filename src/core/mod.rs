@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod cache;
 mod macro_plugin;
-pub mod raw;
-pub mod raw_impl;
+pub mod parts;
 pub mod reader;
 pub mod type_converter;
 pub mod writer;

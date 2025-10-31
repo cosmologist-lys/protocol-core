@@ -2,7 +2,7 @@ use moka::sync::Cache;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
 
-use crate::core::raw::TransportCarrier;
+use crate::core::parts::transport_carrier::TransportCarrier;
 
 // --- 全局缓存定义 ---
 
