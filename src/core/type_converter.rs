@@ -2,7 +2,73 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::math_util::{self, DecimalRoundingMode};
-use crate::{ProtocolError, ProtocolResult, Rawfield, Symbol, handle_int, hex_util};
+use crate::{
+    ProtocolError, ProtocolResult, Rawfield, Symbol, handle_int, handle_int_encode, hex_util,
+};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_decode_roundtrip() {
+        // Test UnsignedU8
+        let field_type = FieldType::UnsignedU8(1.0);
+        let input = "255";
+        let bytes = field_type.encode(input).unwrap();
+        let decoded = field_type.decode(&bytes).unwrap();
+        assert_eq!(decoded, input);
+
+        // Test UnsignedU16 with scaling
+        let field_type = FieldType::UnsignedU16(10.0);
+        let input = "100";
+        let bytes = field_type.encode(input).unwrap();
+        let decoded = field_type.decode(&bytes).unwrap();
+        assert_eq!(decoded, input);
+
+        // Test Float
+        let field_type = FieldType::Float;
+        let input = "3.14";
+        let bytes = field_type.encode(input).unwrap();
+        let decoded = field_type.decode(&bytes).unwrap();
+        assert_eq!(decoded, input);
+
+        // Test Ascii
+        let field_type = FieldType::Ascii;
+        let input = "Hello";
+        let bytes = field_type.encode(input).unwrap();
+        let decoded = field_type.decode(&bytes).unwrap();
+        assert_eq!(decoded, input);
+
+        // Test StringOrBCD
+        let field_type = FieldType::StringOrBCD;
+        let input = "48656C6C6F"; // "Hello" in hex
+        let bytes = field_type.encode(input).unwrap();
+        let decoded = field_type.decode(&bytes).unwrap();
+        assert_eq!(decoded, input.to_uppercase());
+    }
+
+    #[test]
+    fn test_encode_specific_cases() {
+        // Test UnsignedU8
+        let field_type = FieldType::UnsignedU8(1.0);
+        let bytes = field_type.encode("128").unwrap();
+        assert_eq!(hex_util::bytes_to_hex(&bytes).unwrap(), "80");
+        assert_eq!(bytes, vec![128]);
+
+        // Test UnsignedU16
+        let field_type = FieldType::UnsignedU16(1.0);
+        let bytes = field_type.encode("256").unwrap();
+        assert_eq!(hex_util::bytes_to_hex(&bytes).unwrap(), "0100");
+        assert_eq!(bytes, vec![1, 0]);
+
+        // Test Ascii
+        let field_type = FieldType::Ascii;
+        let bytes = field_type.encode("A").unwrap();
+        assert_eq!(hex_util::bytes_to_hex(&bytes).unwrap(), "41");
+        assert_eq!(bytes, vec![65]);
+    }
+}
 #[derive(Debug, Clone)]
 /// 字段类型
 pub enum FieldType {
@@ -21,8 +87,8 @@ pub enum FieldType {
 }
 
 impl FieldType {
-    /// 根据FieldType将大端字节切片转换为字符串表示。
-    pub fn convert(&self, bytes: &[u8]) -> ProtocolResult<String> {
+    /// 根据FieldType将大端字节切片转换为字符串表示。 上行解码
+    pub fn decode(&self, bytes: &[u8]) -> ProtocolResult<String> {
         match self {
             FieldType::StringOrBCD => hex_util::bytes_to_hex(bytes),
             FieldType::UnsignedU8(scale) => handle_int!(u8, 1, bytes, *scale),
@@ -62,6 +128,54 @@ impl FieldType {
                 }
                 // 安全地将ASCII字节转换为String (不会失败)
                 Ok(String::from_utf8(bytes.to_vec()).unwrap())
+            }
+        }
+    }
+
+    // 下行编码
+    pub fn encode(&self, input: &str) -> ProtocolResult<Vec<u8>> {
+        match self {
+            FieldType::StringOrBCD => {
+                let bytes = hex_util::hex_to_bytes(input)?;
+                Ok(bytes)
+            }
+            FieldType::UnsignedU8(scale) => handle_int_encode!(u8, 1, input, *scale),
+            FieldType::UnsignedU16(scale) => handle_int_encode!(u16, 2, input, *scale),
+            FieldType::UnsignedU32(scale) => handle_int_encode!(u32, 4, input, *scale),
+            FieldType::UnsignedU64(scale) => handle_int_encode!(u64, 8, input, *scale),
+            FieldType::SignedI8(scale) => handle_int_encode!(i8, 1, input, *scale),
+            FieldType::SignedI16(scale) => handle_int_encode!(i16, 2, input, *scale),
+            FieldType::SignedI32(scale) => handle_int_encode!(i32, 4, input, *scale),
+            FieldType::SignedI64(scale) => handle_int_encode!(i64, 8, input, *scale),
+            FieldType::Float => {
+                let value: f32 = input.parse().map_err(|_| {
+                    ProtocolError::ValidationFailed(format!(
+                        "Failed to parse input '{}' as f32",
+                        input
+                    ))
+                })?;
+                let bytes = value.to_be_bytes();
+                Ok(bytes.to_vec())
+            }
+            FieldType::Double => {
+                let value: f64 = input.parse().map_err(|_| {
+                    ProtocolError::ValidationFailed(format!(
+                        "Failed to parse input '{}' as f64",
+                        input
+                    ))
+                })?;
+                let bytes = value.to_be_bytes();
+                Ok(bytes.to_vec())
+            }
+            FieldType::Ascii => {
+                // 检查输入是否只包含ASCII字符
+                if !input.is_ascii() {
+                    return Err(ProtocolError::CommonError(
+                        "Input string contains non-ASCII characters".to_string(),
+                    ));
+                }
+                let bytes = input.as_bytes().to_vec();
+                Ok(bytes)
             }
         }
     }
@@ -144,7 +258,7 @@ impl FieldTranslator for FieldConvertDecoder {
             copied_bytes
         };
         let ft = &self.filed_type;
-        let mut value = ft.convert(&input_bytes)?;
+        let mut value = ft.decode(&input_bytes)?;
         // 如果有符号，拼接上去
         if self.symbol.is_some() {
             let symbol_some_clone = self.symbol.clone();
