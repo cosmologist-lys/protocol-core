@@ -17,30 +17,33 @@ static DEVICE_CACHE: Lazy<Cache<String, Arc<TransportCarrier>>> = Lazy::new(|| {
         .build()
 });
 
-// --- 公共访问函数 ---
+pub struct ProtocolCache {}
 
-/// 根据设备号获取设备状态的共享引用 (Arc)。
-/// 如果缓存中不存在或已过期，则返回 None。
-pub fn read(unique: &str) -> Option<Arc<TransportCarrier>> {
-    DEVICE_CACHE.get(unique)
-    // .cloned() // moka v0.10+ 返回 Option<&V>, 需要 clone() 或 cloned()
-    // 注意：moka v0.12+ get() 直接返回 Option<V> (如果是 Arc，则 Arc 被 clone)
-}
+impl ProtocolCache {
+    // --- 公共访问函数 ---
 
-/// 插入或更新设备状态到缓存中。
-/// `state` 应该是 `Arc<DeviceState>` 类型。
-pub fn store(unique: String, state: Arc<TransportCarrier>) {
-    DEVICE_CACHE.insert(unique, state);
-}
+    /// 根据设备号获取设备状态的共享引用 (Arc)。
+    /// 如果缓存中不存在或已过期，则返回 None。
+    pub fn read(unique: &str) -> Option<Arc<TransportCarrier>> {
+        DEVICE_CACHE.get(unique)
+        // .cloned() // moka v0.10+ 返回 Option<&V>, 需要 clone() 或 cloned()
+        // 注意：moka v0.12+ get() 直接返回 Option<V> (如果是 Arc，则 Arc 被 clone)
+    }
 
-/// 从缓存中移除设备状态。
-pub fn remove(device_no: &str) {
-    DEVICE_CACHE.invalidate(device_no);
-}
+    /// 插入或更新设备状态到缓存中。
+    /// `state` 应该是 `Arc<DeviceState>` 类型。
+    pub fn store(unique: &str, state: Arc<TransportCarrier>) {
+        DEVICE_CACHE.insert(unique.into(), state);
+    }
+    /// 从缓存中移除设备状态。
+    pub fn remove(device_no: &str) {
+        DEVICE_CACHE.invalidate(device_no);
+    }
 
-/// 获取缓存中当前的设备数量 (近似值)。
-pub fn read_size() -> u64 {
-    DEVICE_CACHE.entry_count()
+    /// 获取缓存中当前的设备数量 (近似值)。
+    pub fn read_size() -> u64 {
+        DEVICE_CACHE.entry_count()
+    }
 }
 
 // --- 示例用法 (可以在其他模块或JNI函数中调用) ---
