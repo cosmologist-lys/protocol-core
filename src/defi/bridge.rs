@@ -91,6 +91,16 @@ pub struct JarEncodeRequest {
     pub device_id: String,
 }
 
+impl JarEncodeRequest {
+    pub fn from(data: &[u8]) -> ProtocolResult<Self> {
+        let json_string =
+            std::str::from_utf8(data).map_err(|e| ProtocolError::CommonError(e.to_string()))?;
+        let request = serde_json::from_str(json_string)
+            .map_err(|e| ProtocolError::CommonError(e.to_string()))?;
+        Ok(request)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct JarEncodeResponse {
