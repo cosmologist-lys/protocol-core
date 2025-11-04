@@ -31,3 +31,34 @@ macro_rules! handle_int {
         }
     }};
 }
+
+// 内部辅助宏，用于简化整数类型的编码逻辑（从字符串到字节）
+#[macro_export]
+macro_rules! handle_int_encode {
+    ($type:ty, $len:expr, $input:expr, $scale:expr) => {{
+        // 1. 解析输入字符串为f64
+        let parsed_value: f64 = $input.parse().map_err(|_| {
+            ProtocolError::ValidationFailed(format!("Failed to parse input '{}' as f64", $input))
+        })?;
+
+        // 2. 执行反缩放（如果需要）
+        let final_value = if $scale != 1.0 && $scale != 0.0 {
+            // 假设 scale=1.0 表示不缩放
+            math_util::divide(parsed_value, $scale, 6, DecimalRoundingMode::HalfUp)?
+        } else if $scale == 0.0 {
+            return Err(ProtocolError::ValidationFailed(
+                "Scale factor cannot be zero.".to_string(),
+            ));
+        } else {
+            parsed_value
+        };
+
+        // 3. 转换为目标整数类型
+        let int_value: $type = final_value as $type;
+
+        // 4. 转换为大端字节
+        let bytes = int_value.to_be_bytes();
+
+        Ok(bytes.to_vec())
+    }};
+}
