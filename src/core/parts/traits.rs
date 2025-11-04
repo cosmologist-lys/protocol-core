@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{
-    CrcType, DirectionEnum, MsgTypeEnum, core::RW, core::parts::transport_pair::TransportPair,
+    CrcType, DirectionEnum, FieldType, MsgTypeEnum,
+    core::{RW, parts::transport_pair::TransportPair},
 };
 use dyn_clone::DynClone;
 
@@ -81,4 +84,50 @@ pub trait ProtocolConfig {
     fn crc_index(&self) -> (u8, u8);
 
     fn length_index(&self) -> (u8, u8);
+}
+
+// 下行参数设置，针对单个帧字段
+pub trait EncodingParams {
+    fn code(&self) -> String; // 唯一标识符
+    fn title(&self) -> String; // 字段名称
+    fn byte_length(&self) -> u8; // 字节长度，0表示变长，1表示固定长度
+    // 命令码
+    fn cmd_code(&self) -> String {
+        String::new()
+    }
+    fn field_type(&self) -> FieldType; // 实际类型
+    // 前端输入类型，string,int,float
+    fn input_field_type(&self) -> String {
+        match self.field_type() {
+            FieldType::StringOrBCD | FieldType::Ascii => "string".to_string(),
+            FieldType::Float | FieldType::Double => "float".to_string(),
+            _ => "int".to_string(),
+        }
+    }
+    fn default_value(&self) -> String {
+        String::new()
+    }
+    fn default_hex(&self) -> String {
+        String::new()
+    }
+
+    // 是否翻转。true=小端 false=大端
+    fn swap(&self) -> bool {
+        false
+    }
+
+    // 是否必填
+    fn required(&self) -> bool {
+        true
+    }
+}
+
+/// 用于修饰实现了 EncodingParams 的枚举类型
+/// 提供枚举级别的操作接口
+pub trait EncodingDefinition: Sized {
+    /// 获取枚举的所有变体
+    fn variants() -> Vec<Self>;
+
+    /// 获取枚举的所有变体的映射
+    fn variants_map() -> HashMap<String, Self>;
 }
