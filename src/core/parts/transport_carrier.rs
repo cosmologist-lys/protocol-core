@@ -4,17 +4,17 @@ use crate::core::parts::transport_pair::TransportPair;
 // informations with hex + bytes
 #[derive(Debug, Clone, Default)]
 pub struct TransportCarrier {
-    pub device_no: Option<TransportPair>,
-    pub device_no_padding: Option<TransportPair>,
-    pub device_no_length: Option<TransportPair>,
-    pub protocol_version: Option<TransportPair>,
-    pub report_type: Option<TransportPair>,
-    pub control_field: Option<TransportPair>,
-    pub device_type: Option<TransportPair>,
-    pub factory_code: Option<TransportPair>,
-    pub upstream_count: Option<TransportPair>,
-    pub downstream_count: Option<TransportPair>,
-    pub cipher_slot: i8,
+    pub(crate) device_no: Option<TransportPair>,
+    pub(crate) device_no_padding: Option<TransportPair>,
+    pub(crate) device_no_length: Option<TransportPair>,
+    pub(crate) protocol_version: Option<TransportPair>,
+    pub(crate) report_type: Option<TransportPair>,
+    pub(crate) control_field: Option<TransportPair>,
+    pub(crate) device_type: Option<TransportPair>,
+    pub(crate) factory_code: Option<TransportPair>,
+    pub(crate) upstream_count: Option<TransportPair>,
+    pub(crate) downstream_count: Option<TransportPair>,
+    pub(crate) cipher_slot: i8,
 }
 
 impl TransportCarrier {
