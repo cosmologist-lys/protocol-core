@@ -4,16 +4,16 @@ use dyn_clone::DynClone;
 // 报文上/下行解析 处理之后的结果 第二小解析单位，比RawField大
 #[derive(Debug, Clone)]
 pub struct RawCapsule<T: Cmd> {
-    pub bytes: Vec<u8>,
-    pub hex: String,
-    pub field_details: Vec<ReportField>,
-    pub cmd: Option<T>,
-    pub device_no: Option<String>,
-    pub device_id: Option<String>,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) hex: String,
+    pub(crate) field_details: Vec<ReportField>,
+    pub(crate) cmd: Option<T>,
+    pub(crate) device_no: Option<String>,
+    pub(crate) device_id: Option<String>,
     // 临时二进制存放处
-    pub temp_bytes: Vec<u8>,
-    pub direction: DirectionEnum,
-    pub success: bool,
+    pub(crate) temp_bytes: Vec<u8>,
+    pub(crate) direction: DirectionEnum,
+    pub(crate) success: bool,
 }
 
 impl<T: Cmd + 'static> RawCapsule<T> {
@@ -39,7 +39,11 @@ impl<T: Cmd + 'static> RawCapsule<T> {
             field_details: Vec::new(),
             cmd: Some(cmd),
             device_no: Some(device_no.into()),
-            device_id: Some(device_id.into()),
+            device_id: if device_id.is_empty() {
+                None
+            } else {
+                Some(device_id.into())
+            },
             temp_bytes: Vec::new(),
             direction: DirectionEnum::Downstream,
             success: true,
@@ -92,6 +96,10 @@ impl<T: Cmd + 'static> RawCapsule<T> {
             direction: DirectionEnum::Downstream,
             success: true,
         }
+    }
+
+    pub fn into_fields(self) -> Vec<ReportField> {
+        self.field_details
     }
 
     pub fn fail(&mut self) {

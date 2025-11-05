@@ -1,6 +1,9 @@
 use crate::core::parts::raw_capsule::RawCapsule;
 use crate::core::parts::traits::Cmd;
 
+/// 对上行而言，它通常需要回复。因此上行需要2个raw-capsule，一上一下. RawChamber用来组合2个raw-capsule
+/// 对下行而言，它只需要一个下行的raw-capsule. 此时不需要RawChamber
+
 #[derive(Debug, Clone, Default)]
 pub struct RawChamber<T: Cmd + Clone> {
     pub upstream: Option<RawCapsule<T>>,

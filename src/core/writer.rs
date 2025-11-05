@@ -143,18 +143,18 @@ impl Writer {
         &mut self,
         placeholder_tag: &str,
         title: &str,
-        data: &[u8],
-        value: &str,
+        bytes: &[u8],
+        hex: &str,
     ) -> ProtocolResult<&mut Self> {
         // 1. 查找并消耗占位符
         let placeholder = self.into_placeholder_by_tag(placeholder_tag)?;
 
         // 2. 检查数据长度是否与占位符长度完全一致
         let expected_len = placeholder.capacity();
-        if data.len() != expected_len {
+        if bytes.len() != expected_len {
             return Err(ProtocolError::ValidationFailed(format!(
                 "Data length mismatch for placeholder '{placeholder_tag}'. Expected {expected_len} bytes, but got {}",
-                data.len()
+                bytes.len()
             )));
         }
 
@@ -162,10 +162,10 @@ impl Writer {
         let dest_slice = &mut self.buffer[placeholder.start_index..placeholder.end_index];
 
         // 4. 执行覆写
-        dest_slice.copy_from_slice(data);
+        dest_slice.copy_from_slice(bytes);
 
         // 5. 创建 Rawfield
-        let field = Rawfield::new(data, title.into(), value.into());
+        let field = Rawfield::new(bytes, title.into(), hex.into());
 
         // 6. 将 Rawfield 插入到 fields 列表的正确位置
         self.fields.insert(placeholder.pos, field);

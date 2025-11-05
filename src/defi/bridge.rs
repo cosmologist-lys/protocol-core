@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Cmd, ProtocolError, ProtocolResult, RawChamber,
-    core::{MsgTypeEnum, parts::rawfield::Rawfield},
-    utils,
+    Cmd, ProtocolError, ProtocolResult, RawCapsule, RawChamber, Writer,
+    core::{MsgTypeEnum, parts::rawfield::Rawfield, writer},
+    hex_util, utils,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -54,7 +54,7 @@ pub struct JarDecodeResponse {
 }
 
 impl JarDecodeResponse {
-    pub fn from_chamber<T: Cmd + Clone>(chamber: &RawChamber<T>) -> Self {
+    pub fn from_chamber<T: Cmd + Clone>(chamber: &RawChamber<T>) -> ProtocolResult<Self> {
         let request_field_details = if let Some(upstream) = &chamber.upstream {
             upstream.field_details.clone()
         } else {
@@ -66,13 +66,13 @@ impl JarDecodeResponse {
         } else {
             (Vec::new(), String::new())
         };
-        Self {
+        Ok(Self {
             success: chamber.success,
             cmd_code: chamber.cmd_code.clone(),
             field_details: request_field_details,
             rsp_field_details: response_field_details,
             rsp_data: response_hex,
-        }
+        })
     }
     pub fn to_bytes(&self) -> ProtocolResult<Vec<u8>> {
         let json_string =
@@ -104,8 +104,28 @@ impl JarEncodeRequest {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct JarEncodeResponse {
-    pub response_hex: String,
-    pub rsp_field_detail: Vec<ReportField>,
+    pub field_details: Vec<ReportField>,
     // 这才是最终要下行的数据hex
     pub rsp_data: String,
+}
+
+impl JarEncodeResponse {
+    pub fn from_capsule<T: Cmd + Clone>(
+        writer: &Writer,
+        capsule: &RawCapsule<T>,
+    ) -> ProtocolResult<Self> {
+        let fields = capsule.field_details.clone();
+        let bytes = writer.buffer()?;
+        let hex = hex_util::bytes_to_hex(bytes)?;
+        Ok(Self {
+            field_details: fields,
+            rsp_data: hex,
+        })
+    }
+
+    pub fn to_bytes(&self) -> ProtocolResult<Vec<u8>> {
+        let json_string =
+            serde_json::to_string(self).map_err(|e| ProtocolError::CommonError(e.to_string()))?;
+        Ok(json_string.into_bytes())
+    }
 }
