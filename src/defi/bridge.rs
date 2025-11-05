@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Cmd, ProtocolError, ProtocolResult, RawCapsule, RawChamber, Writer,
-    core::{MsgTypeEnum, parts::rawfield::Rawfield, writer},
+    core::{MsgTypeEnum, parts::rawfield::Rawfield},
     hex_util, utils,
 };
 
