@@ -30,6 +30,19 @@ impl ProtocolCache {
         // 注意：moka v0.12+ get() 直接返回 Option<V> (如果是 Arc，则 Arc 被 clone)
     }
 
+    // 从缓存里获取，如果空，则根据unique&upstream_count_hex创建一个新的。upstream_count_hex是上行序列号，通常来说，协议都需要。如果不需要传个随便什么就行。
+    pub fn read_or_default(unique: &str, upstream_count_hex: &str) -> Arc<TransportCarrier> {
+        Self::read(unique).unwrap_or_else(|| {
+            let tp = TransportCarrier::new_with_device_no_and_upstream_count_hex(
+                unique,
+                upstream_count_hex,
+            );
+            let arc_tp = Arc::new(tp);
+            Self::store(unique, Arc::clone(&arc_tp));
+            arc_tp
+        })
+    }
+
     /// 插入或更新设备状态到缓存中。
     /// `state` 应该是 `Arc<DeviceState>` 类型。
     pub fn store(unique: &str, state: Arc<TransportCarrier>) {

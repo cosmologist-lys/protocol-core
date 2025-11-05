@@ -61,4 +61,52 @@ impl<T: Cmd + Clone> RawChamber<T> {
     pub fn success(&self) -> bool {
         self.success
     }
+
+    pub fn device_no(&self) -> Option<&str>
+    where
+        T: 'static,
+    {
+        self.upstream
+            .as_ref()
+            .and_then(|cap| cap.device_no())
+            .or_else(|| self.downstream.as_ref().and_then(|cap| cap.device_no()))
+    }
+
+    pub fn device_no_clone(&self) -> Option<String>
+    where
+        T: 'static,
+    {
+        self.upstream
+            .as_ref()
+            .and_then(|cap| cap.device_no_clone())
+            .or_else(|| {
+                self.downstream
+                    .as_ref()
+                    .and_then(|cap| cap.device_no_clone())
+            })
+    }
+
+    pub fn device_id(&self) -> Option<&str>
+    where
+        T: 'static,
+    {
+        self.upstream
+            .as_ref()
+            .and_then(|cap| cap.device_id())
+            .or_else(|| self.downstream.as_ref().and_then(|cap| cap.device_id()))
+    }
+
+    pub fn device_id_clone(&self) -> Option<String>
+    where
+        T: 'static,
+    {
+        self.upstream
+            .as_ref()
+            .and_then(|cap| cap.device_id_clone())
+            .or_else(|| {
+                self.downstream
+                    .as_ref()
+                    .and_then(|cap| cap.device_id_clone())
+            })
+    }
 }

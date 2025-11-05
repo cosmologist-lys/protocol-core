@@ -1,5 +1,6 @@
 use crate::core::parts::traits::Transport;
 use crate::core::parts::transport_pair::TransportPair;
+use crate::hex_util;
 
 // informations with hex + bytes
 #[derive(Debug, Clone, Default)]
@@ -18,6 +19,30 @@ pub struct TransportCarrier {
 }
 
 impl TransportCarrier {
+    pub fn new_with_device_no_and_upstream_count_hex(
+        device_no: &str,
+        upstream_count: &str,
+    ) -> Self {
+        let device_no_bytes = hex_util::hex_to_bytes(device_no).unwrap();
+        let upstream_count_bytes = hex_util::hex_to_bytes(upstream_count).unwrap();
+        Self {
+            device_no: Some(TransportPair::new(device_no.into(), device_no_bytes)),
+            device_no_padding: None,
+            device_no_length: None,
+            protocol_version: None,
+            report_type: None,
+            control_field: None,
+            device_type: None,
+            factory_code: None,
+            upstream_count: Some(TransportPair::new(
+                upstream_count.into(),
+                upstream_count_bytes,
+            )),
+            downstream_count: None,
+            cipher_slot: -1,
+        }
+    }
+
     pub fn new_with_device_no(
         device_no: &str,
         device_no_bytes: &[u8],

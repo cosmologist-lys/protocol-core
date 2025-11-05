@@ -24,7 +24,10 @@ pub use crate::core::{
 };
 pub use crate::defi::{
     ProtocolResult,
-    bridge::{JarDecodeResponse, JarEncodeRequest, JarEncodeResponse, ReportField},
+    bridge::{
+        /* JarDecodeResponse, JarEncodeRequest, JarEncodeResponse, */ JniRequest, JniResponse,
+        ReportField,
+    },
     crc_enum::CrcType,
     error::{
         ProtocolError, comm_error::CommError, hex_digest_error::HexDigestError, hex_error::HexError,
