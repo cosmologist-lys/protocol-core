@@ -1,8 +1,8 @@
 // hex + bytes
 #[derive(Debug, Clone, Default)]
 pub struct TransportPair {
-    pub hex: String,
-    pub bytes: Vec<u8>,
+    pub(crate) hex: String,
+    pub(crate) bytes: Vec<u8>,
 }
 
 impl TransportPair {
@@ -18,11 +18,20 @@ impl TransportPair {
         self.bytes = bytes.into();
     }
 
-    pub fn get_hex_clone(&self) -> String {
+    // Getter methods
+    pub fn hex(&self) -> &str {
+        &self.hex
+    }
+
+    pub fn hex_clone(&self) -> String {
         self.hex.clone()
     }
 
-    pub fn get_bytes_clone(&self) -> Vec<u8> {
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn bytes_clone(&self) -> Vec<u8> {
         self.bytes.clone()
     }
 }

@@ -182,3 +182,90 @@ impl Transport for TransportCarrier {
         self.cipher_slot
     }
 }
+
+impl TransportCarrier {
+    // Getter methods
+    pub fn device_no(&self) -> Option<&TransportPair> {
+        self.device_no.as_ref()
+    }
+
+    pub fn device_no_clone(&self) -> Option<TransportPair> {
+        self.device_no.clone()
+    }
+
+    pub fn device_no_padding(&self) -> Option<&TransportPair> {
+        self.device_no_padding.as_ref()
+    }
+
+    pub fn device_no_padding_clone(&self) -> Option<TransportPair> {
+        self.device_no_padding.clone()
+    }
+
+    pub fn device_no_length(&self) -> Option<&TransportPair> {
+        self.device_no_length.as_ref()
+    }
+
+    pub fn device_no_length_clone(&self) -> Option<TransportPair> {
+        self.device_no_length.clone()
+    }
+
+    pub fn protocol_version(&self) -> Option<&TransportPair> {
+        self.protocol_version.as_ref()
+    }
+
+    pub fn protocol_version_clone(&self) -> Option<TransportPair> {
+        self.protocol_version.clone()
+    }
+
+    pub fn report_type(&self) -> Option<&TransportPair> {
+        self.report_type.as_ref()
+    }
+
+    pub fn report_type_clone(&self) -> Option<TransportPair> {
+        self.report_type.clone()
+    }
+
+    pub fn control_field(&self) -> Option<&TransportPair> {
+        self.control_field.as_ref()
+    }
+
+    pub fn control_field_clone(&self) -> Option<TransportPair> {
+        self.control_field.clone()
+    }
+
+    pub fn device_type(&self) -> Option<&TransportPair> {
+        self.device_type.as_ref()
+    }
+
+    pub fn device_type_clone(&self) -> Option<TransportPair> {
+        self.device_type.clone()
+    }
+
+    pub fn factory_code(&self) -> Option<&TransportPair> {
+        self.factory_code.as_ref()
+    }
+
+    pub fn factory_code_clone(&self) -> Option<TransportPair> {
+        self.factory_code.clone()
+    }
+
+    pub fn upstream_count(&self) -> Option<&TransportPair> {
+        self.upstream_count.as_ref()
+    }
+
+    pub fn upstream_count_clone(&self) -> Option<TransportPair> {
+        self.upstream_count.clone()
+    }
+
+    pub fn downstream_count(&self) -> Option<&TransportPair> {
+        self.downstream_count.as_ref()
+    }
+
+    pub fn downstream_count_clone(&self) -> Option<TransportPair> {
+        self.downstream_count.clone()
+    }
+
+    pub fn cipher_slot(&self) -> i8 {
+        self.cipher_slot
+    }
+}

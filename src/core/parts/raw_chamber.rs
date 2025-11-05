@@ -6,10 +6,10 @@ use crate::core::parts::traits::Cmd;
 
 #[derive(Debug, Clone, Default)]
 pub struct RawChamber<T: Cmd + Clone> {
-    pub upstream: Option<RawCapsule<T>>,
-    pub downstream: Option<RawCapsule<T>>,
-    pub cmd_code: String,
-    pub success: bool,
+    pub(crate) upstream: Option<RawCapsule<T>>,
+    pub(crate) downstream: Option<RawCapsule<T>>,
+    pub(crate) cmd_code: String,
+    pub(crate) success: bool,
 }
 
 impl<T: Cmd + Clone> RawChamber<T> {
@@ -31,5 +31,34 @@ impl<T: Cmd + Clone> RawChamber<T> {
             cmd_code,
             success,
         }
+    }
+
+    // Getter methods
+    pub fn upstream(&self) -> Option<&RawCapsule<T>> {
+        self.upstream.as_ref()
+    }
+
+    pub fn upstream_clone(&self) -> Option<RawCapsule<T>> {
+        self.upstream.clone()
+    }
+
+    pub fn downstream(&self) -> Option<&RawCapsule<T>> {
+        self.downstream.as_ref()
+    }
+
+    pub fn downstream_clone(&self) -> Option<RawCapsule<T>> {
+        self.downstream.clone()
+    }
+
+    pub fn cmd_code(&self) -> &str {
+        &self.cmd_code
+    }
+
+    pub fn cmd_code_clone(&self) -> String {
+        self.cmd_code.clone()
+    }
+
+    pub fn success(&self) -> bool {
+        self.success
     }
 }

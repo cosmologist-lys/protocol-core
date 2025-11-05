@@ -1,10 +1,10 @@
 // 报文帧字段 最小解析单位
 #[derive(Debug, Clone, Default)]
 pub struct Rawfield {
-    pub bytes: Vec<u8>,
-    pub title: String,
-    pub hex: String,
-    pub value: String,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) title: String,
+    pub(crate) hex: String,
+    pub(crate) value: String,
 }
 
 impl Rawfield {
@@ -30,4 +30,37 @@ impl Rawfield {
     // pub fn hex_to_bytes(&self) -> crate::defi::ProtocolResult<Vec<u8>> {
     //     crate::utils::hex_util::hex_to_bytes(&self.hex)
     // }
+
+    // Getter methods
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn bytes_clone(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    pub fn title_clone(&self) -> String {
+        self.title.clone()
+    }
+
+    pub fn hex(&self) -> &str {
+        &self.hex
+    }
+
+    pub fn hex_clone(&self) -> String {
+        self.hex.clone()
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    pub fn value_clone(&self) -> String {
+        self.value.clone()
+    }
 }

@@ -89,7 +89,7 @@ impl<T: Cmd + 'static> RawCapsule<T> {
             bytes: Vec::new(),
             hex: String::new(),
             field_details: Vec::new(),
-            cmd: up_stream_capsule.get_cmd_clone(),
+            cmd: up_stream_capsule.cmd_clone(),
             device_no,
             device_id,
             temp_bytes: Vec::new(),
@@ -110,8 +110,75 @@ impl<T: Cmd + 'static> RawCapsule<T> {
         self.success
     }
 
-    pub fn get_bytes_ref(&self) -> &[u8] {
+    pub fn bytes(&self) -> &[u8] {
         &self.bytes
+    }
+
+    pub fn bytes_clone(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+
+    pub fn hex(&self) -> &str {
+        &self.hex
+    }
+
+    pub fn hex_clone(&self) -> String {
+        self.hex.clone()
+    }
+
+    pub fn field_details(&self) -> &[ReportField] {
+        &self.field_details
+    }
+
+    pub fn field_details_clone(&self) -> Vec<ReportField> {
+        self.field_details.clone()
+    }
+
+    pub fn cmd(&self) -> Option<&T> {
+        self.cmd.as_ref()
+    }
+
+    pub fn cmd_clone(&self) -> Option<T>
+    where
+        T: DynClone,
+    {
+        self.cmd.as_ref().map(|cmd| dyn_clone::clone(cmd))
+    }
+
+    pub fn device_no(&self) -> Option<&str> {
+        self.device_no.as_deref()
+    }
+
+    pub fn device_no_clone(&self) -> Option<String> {
+        self.device_no.clone()
+    }
+
+    pub fn device_id(&self) -> Option<&str> {
+        self.device_id.as_deref()
+    }
+
+    pub fn device_id_clone(&self) -> Option<String> {
+        self.device_id.clone()
+    }
+
+    pub fn temp_bytes(&self) -> &[u8] {
+        &self.temp_bytes
+    }
+
+    pub fn temp_bytes_clone(&self) -> Vec<u8> {
+        self.temp_bytes.clone()
+    }
+
+    pub fn direction(&self) -> &DirectionEnum {
+        &self.direction
+    }
+
+    pub fn direction_clone(&self) -> DirectionEnum {
+        self.direction.clone()
+    }
+
+    pub fn success(&self) -> bool {
+        self.success
     }
 
     // 把二进制塞回去，同时自动生成hex,通常用于出口的capsule
@@ -145,23 +212,6 @@ impl<T: Cmd + 'static> RawCapsule<T> {
         self.temp_bytes = bytes.to_vec();
     }
 
-    pub fn get_temp_bytes_clone(&self) -> Vec<u8> {
-        self.temp_bytes.clone().to_vec()
-    }
-
-    pub fn get_cmd_ref(&self) -> Option<&T> {
-        self.cmd.as_ref()
-    }
-
-    pub fn get_cmd_clone(&self) -> Option<T>
-    where
-        T: DynClone, // 约束 T 必须支持动态克隆
-    {
-        self.cmd.as_ref().map(|cmd| {
-            // 利用 dyn_clone 克隆 trait 对象
-            dyn_clone::clone(cmd)
-        })
-    }
     pub fn set_fields(&mut self, fields: Vec<ReportField>) {
         self.field_details = fields;
     }
