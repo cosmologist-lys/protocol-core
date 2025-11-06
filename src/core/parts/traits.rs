@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    CrcType, DirectionEnum, FieldType, MsgTypeEnum, ProtocolError, ProtocolResult, Rawfield,
-    Writer,
-    core::{RW, parts::transport_pair::TransportPair},
+    CrcType, DirectionEnum, FieldCompareDecoder, FieldConvertDecoder, FieldType, MsgTypeEnum,
+    ProtocolError, ProtocolResult, Rawfield, Reader, Symbol, TryFromBytes, Writer,
+    core::{RW, parts::transport_pair::TransportPair, type_converter::FieldTranslator},
     hex_util,
 };
 use dyn_clone::DynClone;
@@ -89,10 +89,10 @@ pub trait ProtocolConfig {
 }
 
 // 下行参数设置，针对单个帧字段
-pub trait EncodingParams {
+pub trait AutoEncodingParams {
     fn code(&self) -> String; // 唯一标识符
     fn title(&self) -> String; // 字段名称
-    fn byte_length(&self) -> u8; // 字节长度，0表示变长，1表示固定长度
+    fn byte_length(&self) -> usize; // 字节长度，0表示变长，1表示固定长度
     // 命令码
     fn cmd_code(&self) -> String {
         String::new()
@@ -155,7 +155,7 @@ pub trait EncodingParams {
         }
 
         // 步骤2: 调整字节长度
-        let expected_length = self.byte_length() as usize;
+        let expected_length = self.byte_length();
         let actual_length = bytes.len();
 
         if expected_length > 0 && actual_length != expected_length {
@@ -183,28 +183,31 @@ pub trait EncodingParams {
 
 /// 用于修饰实现了 EncodingParams 的枚举类型
 /// 提供枚举级别的操作接口
-pub trait EncodingDefinition<T: EncodingParams>: Sized {
+pub trait AutoEncoding<T: AutoEncodingParams>: Sized {
     /// 获取枚举的所有变体
-    fn variants() -> Vec<T>;
+    fn variants(&self) -> Vec<T>;
 
     /// 获取枚举的所有变体的映射
-    fn variants_map() -> HashMap<String, T>;
+    fn variants_map(&self) -> HashMap<String, T> {
+        HashMap::new()
+    }
 
-    // 只要定义好了trait:EncodingParams，它就会自动实现它的to_bytes方法。
-    // 这里只需要挨个调用EncodingParams.to_bytes方法就好了
+    // 只要定义好了trait:AutoEncodingParams，它就会自动实现它的to_bytes方法。
+    // 这里只需要挨个调用AutoEncodingParams.to_bytes方法就好了
     // 返回的是整个处理的总长度
     fn auto_process(
         &self,
-        definitions: Vec<Box<dyn EncodingParams>>, // list of EncodingParams
-        params: &HashMap<String, String>,          // 输入的下发参数map
+        params: &HashMap<String, String>, // 输入的下发参数map
         writer: &mut Writer,
     ) -> ProtocolResult<u16> {
         let mut length: usize = 0;
+        let definitions = self.variants();
         for definition in definitions {
             let code = definition.code();
             let title = definition.title();
             // 是否必须
             let require = definition.required();
+
             if let Some(input) = params.get(&code) {
                 let bytes = definition.to_bytes(input)?;
                 length += bytes.len();
@@ -213,11 +216,90 @@ pub trait EncodingDefinition<T: EncodingParams>: Sized {
                     Ok(rf)
                 })?;
             } else if require {
-                return Err(ProtocolError::CommonError(
-                    "input params require but found empty".into(),
-                ));
+                return Err(ProtocolError::CommonError(format!(
+                    "Required parameter '{}' not found in input params",
+                    code
+                )));
             }
         }
         Ok(length as u16)
+    }
+}
+
+pub trait AutoDecodingParams<T: TryFromBytes> {
+    fn byte_length(&self) -> usize; // 字节长度，0表示变长，1表示固定长度
+    fn title(&self) -> String;
+    fn swap(&self) -> bool;
+    // 命令码
+    fn cmd_code(&self) -> String {
+        String::new()
+    }
+    fn symbol(&self) -> Option<Symbol> {
+        None
+    }
+    //帧字段类型 不为空即是: 翻译模式。
+    fn field_type(&self) -> FieldType {
+        FieldType::Empty
+    }
+    //比较目标 不为空即是：比较模式
+    fn compare_target(&self) -> Vec<u8> {
+        vec![]
+    }
+    // 枚举模式，不空即为枚举
+    fn enm_values(&self) -> Vec<(String, T)> {
+        vec![]
+    }
+
+    fn is_enum_mode(&self) -> bool {
+        !self.enm_values().is_empty()
+    }
+
+    fn is_translate_mode(&self) -> bool {
+        self.field_type() != FieldType::Empty
+    }
+
+    fn is_compare_mode(&self) -> bool {
+        !self.compare_target().is_empty()
+    }
+
+    fn translate(&self, bytes: &[u8]) -> ProtocolResult<Rawfield> {
+        if self.is_compare_mode() {
+            FieldCompareDecoder::new(&self.title(), self.compare_target(), self.swap())
+                .translate(bytes)
+        } else if self.is_translate_mode() {
+            FieldConvertDecoder::new(&self.title(), self.field_type(), self.symbol(), self.swap())
+                .translate(bytes)
+        } else if self.is_enum_mode() {
+            FieldCompareDecoder::new(&self.title(), self.compare_target(), self.swap())
+                .translate(bytes)
+        } else {
+            Err(ProtocolError::CommonError("auto-decoding-params requires at least one of the following: enum, translate, compare".into()))
+        }
+    }
+}
+
+pub trait AutoDecoding<T, U>: Sized
+where
+    T: AutoDecodingParams<U>,
+    U: TryFromBytes,
+{
+    /// 获取枚举的所有变体
+    fn variants(&self) -> Vec<T>;
+
+    /// 获取枚举的所有变体的映射
+    fn variants_map(&self) -> HashMap<String, T> {
+        HashMap::new()
+    }
+
+    // 只要定义好了trait:AutoDecodingParams，它就会自动实现解码方法。
+    // 这里只需要挨个调用对应的解码方法就好了
+    // 返回的是整个处理的总长度
+    fn auto_process(&self, reader: &mut Reader) -> ProtocolResult<()> {
+        let definitions = self.variants();
+        for definition in definitions {
+            let byte_length = definition.byte_length();
+            reader.read_and_translate_head(byte_length, |h| definition.translate(h))?;
+        }
+        Ok(())
     }
 }
