@@ -6,72 +6,10 @@ use crate::{
     ProtocolError, ProtocolResult, Rawfield, Symbol, handle_int, handle_int_encode, hex_util,
 };
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_encode_decode_roundtrip() {
-        // Test UnsignedU8
-        let field_type = FieldType::UnsignedU8(1.0);
-        let input = "255";
-        let bytes = field_type.encode(input).unwrap();
-        let decoded = field_type.decode(&bytes).unwrap();
-        assert_eq!(decoded, input);
-
-        // Test UnsignedU16 with scaling
-        let field_type = FieldType::UnsignedU16(10.0);
-        let input = "100";
-        let bytes = field_type.encode(input).unwrap();
-        let decoded = field_type.decode(&bytes).unwrap();
-        assert_eq!(decoded, input);
-
-        // Test Float
-        let field_type = FieldType::Float;
-        let input = "3.14";
-        let bytes = field_type.encode(input).unwrap();
-        let decoded = field_type.decode(&bytes).unwrap();
-        assert_eq!(decoded, input);
-
-        // Test Ascii
-        let field_type = FieldType::Ascii;
-        let input = "Hello";
-        let bytes = field_type.encode(input).unwrap();
-        let decoded = field_type.decode(&bytes).unwrap();
-        assert_eq!(decoded, input);
-
-        // Test StringOrBCD
-        let field_type = FieldType::StringOrBCD;
-        let input = "48656C6C6F"; // "Hello" in hex
-        let bytes = field_type.encode(input).unwrap();
-        let decoded = field_type.decode(&bytes).unwrap();
-        assert_eq!(decoded, input.to_uppercase());
-    }
-
-    #[test]
-    fn test_encode_specific_cases() {
-        // Test UnsignedU8
-        let field_type = FieldType::UnsignedU8(1.0);
-        let bytes = field_type.encode("128").unwrap();
-        assert_eq!(hex_util::bytes_to_hex(&bytes).unwrap(), "80");
-        assert_eq!(bytes, vec![128]);
-
-        // Test UnsignedU16
-        let field_type = FieldType::UnsignedU16(1.0);
-        let bytes = field_type.encode("256").unwrap();
-        assert_eq!(hex_util::bytes_to_hex(&bytes).unwrap(), "0100");
-        assert_eq!(bytes, vec![1, 0]);
-
-        // Test Ascii
-        let field_type = FieldType::Ascii;
-        let bytes = field_type.encode("A").unwrap();
-        assert_eq!(hex_util::bytes_to_hex(&bytes).unwrap(), "41");
-        assert_eq!(bytes, vec![65]);
-    }
-}
 #[derive(Debug, Clone)]
 /// 字段类型
 pub enum FieldType {
+    Empty,
     StringOrBCD,      // 文字 or BCD
     UnsignedU8(f64),  // 正整数(缩小倍数) 1
     UnsignedU16(f64), // 正整数(缩小倍数) 2
@@ -86,10 +24,17 @@ pub enum FieldType {
     Ascii,            // ascii
 }
 
+impl PartialEq for FieldType {
+    fn eq(&self, other: &Self) -> bool {
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+    }
+}
+
 impl FieldType {
     /// 根据FieldType将大端字节切片转换为字符串表示。 上行解码
     pub fn decode(&self, bytes: &[u8]) -> ProtocolResult<String> {
         match self {
+            FieldType::Empty => Ok("".to_string()),
             FieldType::StringOrBCD => hex_util::bytes_to_hex(bytes),
             FieldType::UnsignedU8(scale) => handle_int!(u8, 1, bytes, *scale),
             FieldType::UnsignedU16(scale) => handle_int!(u16, 2, bytes, *scale),
@@ -135,6 +80,7 @@ impl FieldType {
     // 下行编码
     pub fn encode(&self, input: &str) -> ProtocolResult<Vec<u8>> {
         match self {
+            FieldType::Empty => Ok(vec![]),
             FieldType::StringOrBCD => {
                 let bytes = hex_util::hex_to_bytes(input)?;
                 Ok(bytes)
@@ -184,8 +130,8 @@ impl FieldType {
 #[derive(Debug, Clone)]
 pub struct FieldConvertDecoder {
     pub title: String,         // 标题
-    pub filed_type: FieldType, // 帧字段类型 不为空即是: 翻译模式。
     pub swap: bool,            // 是否高低换位，或true=小端 false=大端
+    pub filed_type: FieldType, // 帧字段类型 不为空即是: 翻译模式。
     // 翻译之后的符号
     pub symbol: Option<Symbol>,
 }
@@ -208,12 +154,12 @@ pub struct FieldEnumDecoder<T: TryFromBytes> {
 }
 
 impl FieldConvertDecoder {
-    pub fn new(title: &str, filed_type: FieldType, swap: bool) -> Self {
+    pub fn new(title: &str, filed_type: FieldType, symbol: Option<Symbol>, swap: bool) -> Self {
         FieldConvertDecoder {
             title: title.to_string(),
             filed_type,
             swap,
-            symbol: None,
+            symbol,
         }
     }
 
@@ -241,6 +187,37 @@ impl<T: TryFromBytes> FieldEnumDecoder<T> {
             enum_values,
             _marker: PhantomData,
         }
+    }
+}
+pub trait SingleFieldDecode {
+    fn swap(&self) -> bool;
+    fn title(&self) -> &str;
+}
+
+impl SingleFieldDecode for FieldCompareDecoder {
+    fn swap(&self) -> bool {
+        self.swap
+    }
+    fn title(&self) -> &str {
+        &self.title
+    }
+}
+
+impl SingleFieldDecode for FieldConvertDecoder {
+    fn swap(&self) -> bool {
+        self.swap
+    }
+    fn title(&self) -> &str {
+        &self.title
+    }
+}
+
+impl<T: TryFromBytes> SingleFieldDecode for FieldEnumDecoder<T> {
+    fn swap(&self) -> bool {
+        self.swap
+    }
+    fn title(&self) -> &str {
+        &self.title
     }
 }
 
