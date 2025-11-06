@@ -89,7 +89,7 @@ pub trait ProtocolConfig {
 }
 
 // 下行参数设置，针对单个帧字段
-pub trait AutoEncodingParams {
+pub trait AutoEncodingParam {
     fn code(&self) -> String; // 唯一标识符
     fn title(&self) -> String; // 字段名称
     fn byte_length(&self) -> usize; // 字节长度，0表示变长，1表示固定长度
@@ -183,7 +183,7 @@ pub trait AutoEncodingParams {
 
 /// 用于修饰实现了 EncodingParams 的枚举类型
 /// 提供枚举级别的操作接口
-pub trait AutoEncoding<T: AutoEncodingParams>: Sized {
+pub trait AutoEncoding<T: AutoEncodingParam>: Sized {
     /// 获取枚举的所有变体
     fn variants(&self) -> Vec<T>;
 
@@ -226,7 +226,7 @@ pub trait AutoEncoding<T: AutoEncodingParams>: Sized {
     }
 }
 
-pub trait AutoDecodingParams<T: TryFromBytes> {
+pub trait AutoDecodingParam<T: TryFromBytes> {
     fn byte_length(&self) -> usize; // 字节长度，0表示变长，1表示固定长度
     fn title(&self) -> String;
     fn swap(&self) -> bool;
@@ -280,7 +280,7 @@ pub trait AutoDecodingParams<T: TryFromBytes> {
 
 pub trait AutoDecoding<T, U>: Sized
 where
-    T: AutoDecodingParams<U>,
+    T: AutoDecodingParam<U>,
     U: TryFromBytes,
 {
     /// 获取枚举的所有变体
