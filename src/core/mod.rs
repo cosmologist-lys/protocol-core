@@ -139,6 +139,7 @@ impl MsgTypeEnum {
 
 #[derive(Debug, Clone)]
 pub enum Symbol {
+    Empty,
     Percent,
     Voltage,
     MilliVoltage,
@@ -159,6 +160,7 @@ pub enum Symbol {
 impl Symbol {
     pub fn tag(&self) -> String {
         match self {
+            Symbol::Empty => "".to_string(),
             Symbol::Percent => "%".to_string(),
             Symbol::Voltage => "V".to_string(),
             Symbol::MilliVoltage => "mV".to_string(),

@@ -11,7 +11,10 @@ pub use crate::core::{
         raw_capsule::RawCapsule,
         raw_chamber::RawChamber,
         rawfield::Rawfield,
-        traits::{Cmd, EncodingDefinition, EncodingParams, ProtocolConfig, Transport},
+        traits::{
+            AutoDecoding, AutoDecodingParams, AutoEncoding, AutoEncodingParams, Cmd,
+            ProtocolConfig, Transport,
+        },
         transport_carrier::TransportCarrier,
         transport_pair::TransportPair,
     },
