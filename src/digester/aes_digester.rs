@@ -1,26 +1,53 @@
+//! AES加密解密模块
+//!
+//! 提供多种AES加密模式的实现，包括ECB、CBC、CFB、CTR、OFB、CTS等
+//!
+//! # 警告抑制说明
+//! 由于使用了aes crate内部的GenericArray，会产生deprecation警告
+//! 这是因为generic-array crate版本兼容性问题，暂时抑制警告
+
+#![allow(deprecated)]
+
 use aes::Aes128;
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
 use rand::RngCore;
 
-// 定义AES操作模式
+/// AES操作模式枚举
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AesMode {
+    /// 无加密模式
     NONE,
+    /// 密码分组链接模式(Cipher Block Chaining)
     CBC,
+    /// 密码反馈模式(Cipher Feedback)
     CFB,
+    /// 计数器模式(Counter)
     CTR,
+    /// 密文窃取模式(Cipher Text Stealing)
     CTS,
+    /// 电子密码本模式(Electronic Code Book)
     ECB,
+    /// 输出反馈模式(Output Feedback)
     OFB,
 }
 
-// AES加密器结构体
+/// AES加密器结构体
+///
+/// 支持AES-128加密，提供多种加密模式
 pub struct AesCipher {
     cipher: Aes128,
     mode: AesMode,
 }
 
 impl AesCipher {
+    /// 创建新的AES加密器
+    ///
+    /// # 参数
+    /// * `key` - 16字节的AES-128密钥
+    /// * `mode` - 加密模式
+    ///
+    /// # 返回
+    /// 成功时返回AesCipher实例，失败时返回错误信息
     pub fn new(key: &[u8], mode: AesMode) -> Result<Self, &'static str> {
         if key.len() != 16 {
             return Err("Key must be 16 bytes for AES-128");
@@ -32,7 +59,24 @@ impl AesCipher {
         Ok(AesCipher { cipher, mode })
     }
 
+    /// 获取当前的加密模式
+    pub fn mode(&self) -> AesMode {
+        self.mode
+    }
+
+    /// 加密数据
+    ///
+    /// # 参数
+    /// * `data` - 要加密的数据
+    /// * `iv` - 初始化向量(某些模式需要，ECB和NONE模式会忽略)
+    ///
+    /// # 返回
+    /// 成功时返回加密后的数据，失败时返回错误信息
     pub fn encrypt(&self, data: &[u8], iv: &[u8]) -> Result<Vec<u8>, &'static str> {
+        if data.is_empty() {
+            return Ok(Vec::new());
+        }
+
         match self.mode {
             AesMode::ECB => self.encrypt_ecb(data),
             AesMode::CBC => self.encrypt_cbc(data, iv),
@@ -44,7 +88,19 @@ impl AesCipher {
         }
     }
 
+    /// 解密数据
+    ///
+    /// # 参数
+    /// * `data` - 要解密的数据
+    /// * `iv` - 初始化向量(某些模式需要，ECB和NONE模式会忽略)
+    ///
+    /// # 返回
+    /// 成功时返回解密后的数据，失败时返回错误信息
     pub fn decrypt(&self, data: &[u8], iv: &[u8]) -> Result<Vec<u8>, &'static str> {
+        if data.is_empty() {
+            return Ok(Vec::new());
+        }
+
         match self.mode {
             AesMode::ECB => self.decrypt_ecb(data),
             AesMode::CBC => self.decrypt_cbc(data, iv),
@@ -265,39 +321,6 @@ impl AesCipher {
         self.encrypt_ofb(data, iv)
     }
 
-    // PCBC模式解密
-    fn decrypt_pcbc(&self, data: &[u8], iv: &[u8]) -> Result<Vec<u8>, &'static str> {
-        if iv.len() != 16 {
-            return Err("IV must be 16 bytes");
-        }
-        if !data.len().is_multiple_of(16) {
-            return Err("Data length must be multiple of 16 bytes");
-        }
-
-        let mut result = Vec::with_capacity(data.len());
-        let mut prev_plain = GenericArray::clone_from_slice(iv);
-        let mut prev_cipher = GenericArray::clone_from_slice(iv);
-
-        for chunk in data.chunks(16) {
-            let mut block = GenericArray::clone_from_slice(chunk);
-            let current_cipher = block;
-
-            self.cipher.decrypt_block(&mut block);
-
-            // XOR with (previous plaintext XOR previous ciphertext)
-            for i in 0..16 {
-                block[i] ^= prev_plain[i] ^ prev_cipher[i];
-            }
-
-            result.extend_from_slice(&block);
-
-            prev_plain = block;
-            prev_cipher = current_cipher;
-        }
-
-        self.pkcs7_unpad(&result)
-    }
-
     // CTS模式加密
     fn encrypt_cts(&self, data: &[u8], iv: &[u8]) -> Result<Vec<u8>, &'static str> {
         if iv.len() != 16 {
@@ -447,19 +470,49 @@ impl AesCipher {
     }
 }
 
-// 工具函数：生成随机IV
+/// 生成随机的16字节初始化向量(IV)
+///
+/// # 返回
+/// 16字节的随机IV数组
 pub fn generate_iv() -> [u8; 16] {
     let mut iv = [0u8; 16];
     rand::rng().fill_bytes(&mut iv);
     iv
 }
 
-// 工具函数：将数据转换为十六进制字符串
+/// 将字节数据转换为十六进制字符串
+///
+/// # 参数
+/// * `data` - 要转换的字节数据
+///
+/// # 返回
+/// 十六进制字符串表示
 pub fn to_hex(data: &[u8]) -> String {
     hex::encode(data)
 }
 
-// 工具函数：从十六进制字符串解析数据
+/// 从十六进制字符串解析字节数据
+///
+/// # 参数
+/// * `hex_str` - 十六进制字符串
+///
+/// # 返回
+/// 成功时返回字节向量，失败时返回解析错误
 pub fn from_hex(hex_str: &str) -> Result<Vec<u8>, hex::FromHexError> {
     hex::decode(hex_str)
+}
+
+/// 便捷函数：创建ECB模式的AES加密器
+pub fn new_ecb_cipher(key: &[u8]) -> Result<AesCipher, &'static str> {
+    AesCipher::new(key, AesMode::ECB)
+}
+
+/// 便捷函数：创建CBC模式的AES加密器
+pub fn new_cbc_cipher(key: &[u8]) -> Result<AesCipher, &'static str> {
+    AesCipher::new(key, AesMode::CBC)
+}
+
+/// 便捷函数：创建CTR模式的AES加密器
+pub fn new_ctr_cipher(key: &[u8]) -> Result<AesCipher, &'static str> {
+    AesCipher::new(key, AesMode::CTR)
 }
