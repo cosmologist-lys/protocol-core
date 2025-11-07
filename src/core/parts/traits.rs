@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    CrcType, DirectionEnum, FieldCompareDecoder, FieldConvertDecoder, FieldType, MsgTypeEnum,
-    ProtocolError, ProtocolResult, Rawfield, Reader, Symbol, TryFromBytes, Writer,
+    CrcType, DirectionEnum, FieldCompareDecoder, FieldConvertDecoder, FieldEnumDecoder, FieldType,
+    MsgTypeEnum, ProtocolError, ProtocolResult, Rawfield, Reader, Symbol, TryFromBytes, Writer,
     core::{RW, parts::transport_pair::TransportPair, type_converter::FieldTranslator},
     hex_util,
 };
@@ -246,12 +246,12 @@ pub trait AutoDecodingParam<T: TryFromBytes> {
         vec![]
     }
     // 枚举模式，不空即为枚举
-    fn enm_values(&self) -> Vec<(String, T)> {
+    fn enum_values(&self) -> Vec<(T, String)> {
         vec![]
     }
 
     fn is_enum_mode(&self) -> bool {
-        !self.enm_values().is_empty()
+        !self.enum_values().is_empty()
     }
 
     fn is_translate_mode(&self) -> bool {
@@ -270,8 +270,7 @@ pub trait AutoDecodingParam<T: TryFromBytes> {
             FieldConvertDecoder::new(&self.title(), self.field_type(), self.symbol(), self.swap())
                 .translate(bytes)
         } else if self.is_enum_mode() {
-            FieldCompareDecoder::new(&self.title(), self.compare_target(), self.swap())
-                .translate(bytes)
+            FieldEnumDecoder::new(&self.title(), self.enum_values(), self.swap()).translate(bytes)
         } else {
             Err(ProtocolError::CommonError("auto-decoding-params requires at least one of the following: enum, translate, compare".into()))
         }
