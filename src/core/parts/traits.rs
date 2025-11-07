@@ -226,10 +226,18 @@ pub trait AutoEncoding<T: AutoEncodingParam>: Sized {
     }
 }
 
-pub trait AutoDecodingParam<T: TryFromBytes> {
+/// 上行参数解码，针对单个帧字段
+/// 使用默认泛型参数解决"被迫指定无用泛型"的问题
+/// 对于不需要枚举功能的实现，可以省略泛型参数（默认使用 u8 类型）
+pub trait AutoDecodingParam<T = u8>
+where
+    T: TryFromBytes,
+{
     fn byte_length(&self) -> usize; // 字节长度，0表示变长，1表示固定长度
     fn title(&self) -> String;
-    fn swap(&self) -> bool;
+    fn swap(&self) -> bool {
+        false
+    }
     // 命令码
     fn cmd_code(&self) -> String {
         String::new()
@@ -277,7 +285,9 @@ pub trait AutoDecodingParam<T: TryFromBytes> {
     }
 }
 
-pub trait AutoDecoding<T, U>: Sized
+/// 自动解码处理trait
+/// 同样使用默认泛型参数简化使用
+pub trait AutoDecoding<T, U = u8>: Sized
 where
     T: AutoDecodingParam<U>,
     U: TryFromBytes,
