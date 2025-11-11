@@ -7,7 +7,7 @@ use crate::{
     utils,
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportField {
     pub name: String,
@@ -40,32 +40,40 @@ impl Rawfield {
         }
     }
 }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct JniRequest {
-    pub(crate) device_id: String,
-    pub(crate) device_no: String,
-    pub(crate) msgt_type: String,
-    pub(crate) cmd_code: String,
+    #[serde(default)]
+    pub(crate) device_id: Option<String>,
+    #[serde(default)]
+    pub(crate) device_no: Option<String>,
+    #[serde(default)]
+    pub(crate) msg_type: Option<String>,
+    #[serde(default)]
+    pub(crate) cmd_code: Option<String>,
+    #[serde(default)]
     pub(crate) hex: String,
-    pub(crate) uri: String,
-    pub(crate) params: HashMap<String, String>,
+    #[serde(default)]
+    pub(crate) uri: Option<String>,
+    #[serde(default)]
+    pub(crate) params: Option<HashMap<String, String>>,
 }
 
 impl JniRequest {
     pub fn new(
-        device_id: String,
-        device_no: String,
-        msgt_type: String,
-        cmd_code: String,
+        device_id: Option<String>,
+        device_no: Option<String>,
+        msgt_type: Option<String>,
+        cmd_code: Option<String>,
         hex: String,
-        uri: String,
-        params: HashMap<String, String>,
+        uri: Option<String>,
+        params: Option<HashMap<String, String>>,
     ) -> Self {
         JniRequest {
             device_id,
             device_no,
-            msgt_type,
+            msg_type: msgt_type,
             cmd_code,
             hex,
             uri,
@@ -88,12 +96,12 @@ impl JniRequest {
     }
 
     // Getter methods
-    pub fn device_id(&self) -> &str {
-        &self.device_id
+    pub fn device_id(&self) -> Option<&str> {
+        self.device_id.as_deref()
     }
 
     pub fn device_id_clone(&self) -> String {
-        self.device_id.clone()
+        self.device_id.clone().unwrap_or_default()
     }
 
     pub fn hex(&self) -> &str {
@@ -104,44 +112,44 @@ impl JniRequest {
         self.hex.clone()
     }
 
-    pub fn device_no(&self) -> &str {
-        &self.device_no
+    pub fn device_no(&self) -> Option<&str> {
+        self.device_no.as_deref()
     }
 
     pub fn device_no_clone(&self) -> String {
-        self.device_no.clone()
+        self.device_no.clone().unwrap_or_default()
     }
 
-    pub fn msgt_type(&self) -> &str {
-        &self.msgt_type
+    pub fn msg_type(&self) -> Option<&str> {
+        self.msg_type.as_deref()
     }
 
-    pub fn msgt_type_clone(&self) -> String {
-        self.msgt_type.clone()
+    pub fn msg_type_clone(&self) -> String {
+        self.msg_type.clone().unwrap_or_default()
     }
 
-    pub fn cmd_code(&self) -> &str {
-        &self.cmd_code
+    pub fn cmd_code(&self) -> Option<&str> {
+        self.cmd_code.as_deref()
     }
 
     pub fn cmd_code_clone(&self) -> String {
-        self.cmd_code.clone()
+        self.cmd_code.clone().unwrap_or_default()
     }
 
-    pub fn uri(&self) -> &str {
-        &self.uri
+    pub fn uri(&self) -> Option<&str> {
+        self.uri.as_deref()
     }
 
     pub fn uri_clone(&self) -> String {
-        self.uri.clone()
+        self.uri.clone().unwrap_or_default()
     }
 
-    pub fn params(&self) -> &HashMap<String, String> {
-        &self.params
+    pub fn params(&self) -> Option<&HashMap<String, String>> {
+        self.params.as_ref()
     }
 
     pub fn params_clone(&self) -> HashMap<String, String> {
-        self.params.clone()
+        self.params.clone().unwrap_or_default()
     }
 }
 
@@ -149,14 +157,24 @@ impl JniRequest {
 #[serde(rename_all = "camelCase")]
 pub struct JniResponse {
     pub(crate) success: bool,
-    pub(crate) device_id: String,
-    pub(crate) device_no: String,
-    pub(crate) msgt_type: String,
-    pub(crate) cmd_code: String,
+    #[serde(default)]
+    pub(crate) device_id: Option<String>,
+    #[serde(default)]
+    pub(crate) device_no: Option<String>,
+    #[serde(rename = "msgType", default)]
+    pub(crate) msg_type: Option<String>,
+    #[serde(default)]
+    pub(crate) cmd_code: Option<String>,
+    #[serde(default)]
     pub(crate) req_hex: String,
+    #[serde(default)]
     pub(crate) rsp_hex: String,
+    #[serde(default)]
     pub(crate) req_jsons: Vec<ReportField>,
+    #[serde(default)]
     pub(crate) rsp_jsons: Vec<ReportField>,
+    #[serde(default)]
+    pub(crate) err_msg: Option<String>,
 }
 
 impl JniResponse {
@@ -166,41 +184,64 @@ impl JniResponse {
         Ok(json_string.into_bytes())
     }
 
+    pub fn new_with_err_msg(device_no: &str, cmd_code: &str, err_msg: &str) -> Self {
+        Self {
+            success: false,
+            device_id: None,
+            device_no: Some(device_no.into()),
+            msg_type: None,
+            cmd_code: Some(cmd_code.into()),
+            req_hex: String::new(),
+            rsp_hex: String::new(),
+            req_jsons: Vec::new(),
+            rsp_jsons: Vec::new(),
+            err_msg: Some(err_msg.into()),
+        }
+    }
+
+    pub fn from(data: &[u8]) -> ProtocolResult<Self> {
+        let json_string =
+            std::str::from_utf8(data).map_err(|e| ProtocolError::CommonError(e.to_string()))?;
+        let response = serde_json::from_str(json_string)
+            .map_err(|e| ProtocolError::CommonError(e.to_string()))?;
+        Ok(response)
+    }
+
     // Getter methods
     pub fn success(&self) -> bool {
         self.success
     }
 
-    pub fn device_id(&self) -> &str {
-        &self.device_id
+    pub fn device_id(&self) -> Option<&str> {
+        self.device_id.as_deref()
     }
 
     pub fn device_id_clone(&self) -> String {
-        self.device_id.clone()
+        self.device_id.clone().unwrap_or_default()
     }
 
-    pub fn device_no(&self) -> &str {
-        &self.device_no
+    pub fn device_no(&self) -> Option<&str> {
+        self.device_no.as_deref()
     }
 
     pub fn device_no_clone(&self) -> String {
-        self.device_no.clone()
+        self.device_no.clone().unwrap_or_default()
     }
 
-    pub fn msgt_type(&self) -> &str {
-        &self.msgt_type
+    pub fn msg_type(&self) -> Option<&str> {
+        self.msg_type.as_deref()
     }
 
-    pub fn msgt_type_clone(&self) -> String {
-        self.msgt_type.clone()
+    pub fn msg_type_clone(&self) -> String {
+        self.msg_type.clone().unwrap_or_default()
     }
 
-    pub fn cmd_code(&self) -> &str {
-        &self.cmd_code
+    pub fn cmd_code(&self) -> Option<&str> {
+        self.cmd_code.as_deref()
     }
 
     pub fn cmd_code_clone(&self) -> String {
-        self.cmd_code.clone()
+        self.cmd_code.clone().unwrap_or_default()
     }
 
     pub fn req_hex(&self) -> &str {
@@ -235,25 +276,33 @@ impl JniResponse {
         self.rsp_jsons.clone()
     }
 
+    pub fn err_msg(&self) -> Option<&str> {
+        self.err_msg.as_deref()
+    }
+
+    pub fn set_err_msg(&mut self, err_msg: &str) {
+        self.err_msg = Some(err_msg.to_string());
+    }
+
     // Setter methods
     pub fn set_success(&mut self, success: bool) {
         self.success = success;
     }
 
     pub fn set_device_id(&mut self, device_id: &str) {
-        self.device_id = device_id.to_string();
+        self.device_id = Some(device_id.to_string());
     }
 
     pub fn set_device_no(&mut self, device_no: &str) {
-        self.device_no = device_no.to_string();
+        self.device_no = Some(device_no.to_string());
     }
 
     pub fn set_msgt_type(&mut self, msgt_type: &str) {
-        self.msgt_type = msgt_type.to_string();
+        self.msg_type = Some(msgt_type.to_string());
     }
 
     pub fn set_cmd_code(&mut self, cmd_code: &str) {
-        self.cmd_code = cmd_code.to_string();
+        self.cmd_code = Some(cmd_code.to_string());
     }
 
     pub fn set_req_hex(&mut self, req_hex: &str) {
@@ -276,8 +325,8 @@ impl JniResponse {
     pub fn upstream_response<T: Cmd + Clone + 'static>(
         chamber: &RawChamber<T>,
     ) -> ProtocolResult<Self> {
-        let device_id = chamber.device_id_clone().unwrap_or_default();
-        let device_no = chamber.device_no_clone().unwrap_or_default();
+        let device_id = chamber.device_id_clone();
+        let device_no = chamber.device_no_clone();
         // 获取 cmd_code
         let cmd_code = chamber.cmd_code_clone();
         // 获取 upstream 的 hex 和 field_details
@@ -293,17 +342,18 @@ impl JniResponse {
             (String::new(), Vec::new())
         };
         // msgt_type 暂时设置为空字符串，根据实际需求调整
-        let msgt_type = String::new();
+        let msgt_type = Some(String::new());
         Ok(Self {
             success: chamber.success(),
             device_id,
             device_no,
-            msgt_type,
-            cmd_code,
+            msg_type: msgt_type,
+            cmd_code: Some(cmd_code),
             req_hex,
             rsp_hex,
             req_jsons,
             rsp_jsons,
+            err_msg: None,
         })
     }
 
@@ -312,8 +362,8 @@ impl JniResponse {
         capsule: &RawCapsule<T>,
     ) -> ProtocolResult<Self> {
         // 获取 device_id 和 device_no
-        let device_id = capsule.device_id_clone().unwrap_or_default();
-        let device_no = capsule.device_no_clone().unwrap_or_default();
+        let device_id = capsule.device_id_clone();
+        let device_no = capsule.device_no_clone();
 
         // 获取 cmd_code (从 cmd 中提取)
         let cmd_code = capsule.cmd().map(|cmd| cmd.code()).unwrap_or_default();
@@ -327,18 +377,19 @@ impl JniResponse {
         let rsp_jsons = capsule.field_details_clone();
 
         // msgt_type 暂时设置为空字符串
-        let msgt_type = String::new();
+        let msgt_type = Some(String::new());
 
         Ok(Self {
             success: capsule.success(),
             device_id,
             device_no,
-            msgt_type,
-            cmd_code,
+            msg_type: msgt_type,
+            cmd_code: Some(cmd_code),
             req_hex,
             rsp_hex,
             req_jsons,
             rsp_jsons,
+            err_msg: None,
         })
     }
 }
